@@ -1,0 +1,273 @@
+#+title: Otoko
+
+* Frontend
+** Main
+#+begin_src shell
+$ ./build/yano-frontend-bin 8000 "http://192.188.200.56:9001"
+#+end_src
+** Start
+#+begin_src shell
+$ sudo mitmproxy --mode reverse:http://192.188.200.57:9000 -p 9001 --showhost --set block_global=false -s ./fe_tunnel.py
+#+end_src
+** Script
+#+begin_src python
+from mitmproxy import http
+
+KEY = b"mysecretkey"  # même clé côté backend
+
+def xor_bytes(data: bytes, key: bytes) -> bytes:
+    if not data:
+        return data
+    out = bytearray(len(data))
+    for i, b in enumerate(data):
+        out[i] = b ^ key[i % len(key)]
+    return bytes(out)
+
+def request(flow: http.HTTPFlow) -> None:
+    # Evite compression pour avoir un body stable
+    flow.request.headers["Accept-Encoding"] = "identity"
+
+    # === Direction client -> backend proxy ===
+    # On transforme le body avant d'envoyer vers BE
+    if flow.request.raw_content:
+        flow.request.raw_content = xor_bytes(flow.request.raw_content, KEY)
+        flow.request.headers["X-Tunnel-Xor"] = "1"
+        flow.request.headers.pop("Content-Length", None)
+
+def response(flow: http.HTTPFlow) -> None:
+    # === Direction backend proxy -> client ===
+    # On restaure le body reçu de BE avant de renvoyer au client
+    if flow.response and flow.response.headers.get("X-Tunnel-Xor") == "1":
+        if flow.response.raw_content:
+            flow.response.raw_content = xor_bytes(flow.response.raw_content, KEY)
+        flow.response.headers.pop("X-Tunnel-Xor", None)
+        flow.response.headers.pop("Content-Length", None)
+#+end_src
+
+* Backend
+** Main
+#+begin_src shell
+$ ./build/yano-backend-bin 9002 "http://192.188.200.55"
+#+end_src
+** Start
+#+begin_src shell
+sudo mitmproxy --mode reverse:http://192.188.200.57:9002 -p 9000 --showhost --set block_global=false -s ./be_tunnel.py
+#+end_src
+** Script
+#+begin_src python
+from mitmproxy import http
+
+KEY = b"mysecretkey"  # même clé côté frontend
+
+def xor_bytes(data: bytes, key: bytes) -> bytes:
+    if not data:
+        return data
+    out = bytearray(len(data))
+    for i, b in enumerate(data):
+        out[i] = b ^ key[i % len(key)]
+    return bytes(out)
+
+def request(flow: http.HTTPFlow) -> None:
+    # === Direction FE -> API réelle ===
+    # On restaure le body avant de l'envoyer à l'API réelle
+    if flow.request.headers.get("X-Tunnel-Xor") == "1":
+        if flow.request.raw_content:
+            flow.request.raw_content = xor_bytes(flow.request.raw_content, KEY)
+        flow.request.headers.pop("X-Tunnel-Xor", None)
+        flow.request.headers.pop("Content-Length", None)
+
+def response(flow: http.HTTPFlow) -> None:
+    # === Direction API réelle -> FE ===
+    # On transforme le body avant de le renvoyer vers FE
+    if flow.response and flow.response.raw_content:
+        flow.response.raw_content = xor_bytes(flow.response.raw_content, KEY)
+        flow.response.headers["X-Tunnel-Xor"] = "1"
+        flow.response.headers.pop("Content-Length", None)
+#+end_src
+
+* Test
+** Frontend
+#+begin_src shell
+$ sudo tcpdump -A -ni any host 192.188.200.57 and port 9000
+#+end_src
+
+* AES-GCM
+** Key
+#+begin_src shell
+$ openssl rand -base64 32
+#+end_src
+** Frontend script
+#+begin_src python
+import base64
+import os
+from mitmproxy import http, ctx
+
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+# Clé AES-256 en base64 (32 octets après décodage)
+KEY_B64 = "REMPLACE_MOI_PAR_TA_CLE_BASE64_32OCTETS"
+KEY = base64.b64decode(KEY_B64)
+if len(KEY) != 32:
+    raise ValueError("KEY_B64 doit décoder vers 32 octets (AES-256).")
+
+AES = AESGCM(KEY)
+
+HDR_FLAG = "X-Tunnel-AESGCM"
+HDR_NONCE = "X-Tunnel-Nonce"  # nonce en base64 (12 octets)
+
+def _b64e(b: bytes) -> str:
+    return base64.b64encode(b).decode("ascii")
+
+def _b64d(s: str) -> bytes:
+    return base64.b64decode(s.encode("ascii"))
+
+def request(flow: http.HTTPFlow) -> None:
+    # Évite compression (body stable côté app)
+    flow.request.headers["Accept-Encoding"] = "identity"
+
+    # (Optionnel) limite au endpoint
+    # if not flow.request.path.startswith("/api/videos"):
+    #     return
+
+    raw = flow.request.raw_content or b""
+    if raw:
+        nonce = os.urandom(12)  # recommandé pour GCM
+        ct = AES.encrypt(nonce, raw, associated_data=None)
+
+        flow.request.raw_content = ct
+        flow.request.headers[HDR_FLAG] = "1"
+        flow.request.headers[HDR_NONCE] = _b64e(nonce)
+        flow.request.headers.pop("Content-Length", None)
+
+def response(flow: http.HTTPFlow) -> None:
+    # (Optionnel) limite au endpoint
+    # if not flow.request.path.startswith("/api/videos"):
+    #     return
+
+    if not flow.response:
+        return
+
+    if flow.response.headers.get(HDR_FLAG) != "1":
+        return
+
+    try:
+        nonce_b64 = flow.response.headers.get(HDR_NONCE, "")
+        nonce = _b64d(nonce_b64)
+
+        ct = flow.response.raw_content or b""
+        if ct:
+            pt = AES.decrypt(nonce, ct, associated_data=None)
+            flow.response.raw_content = pt
+
+        # Nettoyage headers tunnel
+        flow.response.headers.pop(HDR_FLAG, None)
+        flow.response.headers.pop(HDR_NONCE, None)
+        flow.response.headers.pop("Content-Length", None)
+
+    except Exception as e:
+        ctx.log.error(f"FE decrypt failed: {e}")
+        flow.response = http.Response.make(
+            502,
+            b"Bad Gateway (FE decrypt failed)",
+            {"Content-Type": "text/plain; charset=utf-8"},
+        )
+#+end_src
+
+** Frontend start
+#+begin_src shell
+$ sudo mitmproxy \
+  --listen-host 0.0.0.0 \
+  --mode reverse:http://192.188.200.57:9000 \
+  -p 9001 \
+  --showhost \
+  --set block_global=false \
+  -s ./fe_tunnel_aesgcm.py
+#+end_src
+
+** Backend script
+#+begin_src python
+import base64
+import os
+from mitmproxy import http, ctx
+
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+KEY_B64 = "REMPLACE_MOI_PAR_TA_CLE_BASE64_32OCTETS"
+KEY = base64.b64decode(KEY_B64)
+if len(KEY) != 32:
+    raise ValueError("KEY_B64 doit décoder vers 32 octets (AES-256).")
+
+AES = AESGCM(KEY)
+
+HDR_FLAG = "X-Tunnel-AESGCM"
+HDR_NONCE = "X-Tunnel-Nonce"
+
+def _b64e(b: bytes) -> str:
+    return base64.b64encode(b).decode("ascii")
+
+def _b64d(s: str) -> bytes:
+    return base64.b64decode(s.encode("ascii"))
+
+def request(flow: http.HTTPFlow) -> None:
+    # (Optionnel) limite au endpoint
+    # if not flow.request.path.startswith("/api/videos"):
+    #     return
+
+    if flow.request.headers.get(HDR_FLAG) != "1":
+        return
+
+    try:
+        nonce_b64 = flow.request.headers.get(HDR_NONCE, "")
+        nonce = _b64d(nonce_b64)
+
+        ct = flow.request.raw_content or b""
+        if ct:
+            pt = AES.decrypt(nonce, ct, associated_data=None)
+            flow.request.raw_content = pt
+
+        # Nettoyage headers tunnel avant l'API réelle
+        flow.request.headers.pop(HDR_FLAG, None)
+        flow.request.headers.pop(HDR_NONCE, None)
+        flow.request.headers.pop("Content-Length", None)
+
+    except Exception as e:
+        ctx.log.error(f"BE decrypt failed: {e}")
+        flow.response = http.Response.make(
+            400,
+            b"Bad Request (BE decrypt failed)",
+            {"Content-Type": "text/plain; charset=utf-8"},
+        )
+
+def response(flow: http.HTTPFlow) -> None:
+    # (Optionnel) limite au endpoint
+    # if not flow.request.path.startswith("/api/videos"):
+    #     return
+
+    if not flow.response:
+        return
+
+    raw = flow.response.raw_content or b""
+    if raw:
+        nonce = os.urandom(12)
+        ct = AES.encrypt(nonce, raw, associated_data=None)
+
+        flow.response.raw_content = ct
+        flow.response.headers[HDR_FLAG] = "1"
+        flow.response.headers[HDR_NONCE] = _b64e(nonce)
+        flow.response.headers.pop("Content-Length", None)
+#+end_src
+
+** Backend start
+#+begin_src shell
+$ sudo mitmproxy \
+  --listen-host 0.0.0.0 \
+  --mode reverse:http://192.188.200.57:9002 \
+  -p 9000 \
+  --showhost \
+  --set block_global=false \
+  -s ./be_tunnel_aesgcm.py
+#+end_src
+
+** Notice
+If we want to limit to the path "/api/videos", we just have to uncomment the right lines the script.
+
