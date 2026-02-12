@@ -271,3 +271,17 @@ $ sudo mitmproxy \
 ** Notice
 If we want to limit to the path "/api/videos", we just have to uncomment the right lines the script.
 
+
+* Iptables
+** Short information
+I preferred to use the base usage of mitm because of complexity with iptables.
+#+begin_src shell
+$ iptables -t nat -L OUTPUT -n -v --line-numbers
+Chain OUTPUT (policy ACCEPT 28 packets, 2200 bytes)
+num   pkts bytes target     prot opt in     out     source               destination
+$ sudo iptables -t nat -S
+-P PREROUTING ACCEPT
+-P INPUT ACCEPT
+-P OUTPUT ACCEPT
+-P POSTROUTING ACCEPT
+#+end_src
