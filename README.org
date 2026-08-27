@@ -3,8 +3,8 @@
 Just to brainstorm about a multi-agent system conception thank to AI. The idea is to analyze different logs from a /FreeBSD/ server using /jails/ as architecture.
 * Architecture
 #+begin_src emacs-lisp
-                    SERVEUR FREEBSD
-                 192.168.1.100
+                 SERVEUR FREEBSD
+                  192.168.1.100
                          │
                          │ SSH
                          ▼
@@ -54,6 +54,64 @@ Just to brainstorm about a multi-agent system conception thank to AI. The idea i
                          │
                          ▼
                   IncidentReport
+#+end_src
+* Organisation
+#+begin_src emacs-lisp
+otoko/
+│
+├── Cargo.toml
+│
+├── config/
+│   └── default.toml
+│
+├── src/
+│   │
+│   ├── main.rs
+│   ├── lib.rs
+│   │
+│   ├── domain/
+│   │   ├── mod.rs
+│   │   ├── log.rs
+│   │   ├── event.rs
+│   │   ├── incident.rs
+│   │   └── report.rs
+│   │
+│   ├── collector/
+│   │   ├── mod.rs
+│   │   └── ssh.rs
+│   │
+│   ├── normalizer/
+│   │   ├── mod.rs
+│   │   └── syslog.rs
+│   │
+│   ├── agents/
+│   │   ├── mod.rs
+│   │   ├── analyzer.rs
+│   │   ├── correlator.rs
+│   │   ├── severity.rs
+│   │   ├── diagnosis.rs
+│   │   └── reporter.rs
+│   │
+│   ├── orchestration/
+│   │   ├── mod.rs
+│   │   └── orchestrator.rs
+│   │
+│   ├── llm/
+│   │   ├── mod.rs
+│   │   └── provider.rs
+│   │
+│   └── config/
+│       └── mod.rs
+│
+└── tests/
+    ├── collector.rs
+    ├── normalizer.rs
+    ├── analyzer.rs
+    ├── correlator.rs
+    ├── severity.rs
+    ├── diagnosis.rs
+    ├── reporter.rs
+    └── pipeline.rs
 #+end_src
 * Functions
 ** Summary
