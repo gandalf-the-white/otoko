@@ -1,0 +1,13 @@
+[package]
+name = "otoko"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.104"
+async-trait = "0.1.92"
+chrono = { version = "0.4.45", features = ["serde"] }
+rig = "0.42.0"
+schemars = "1.2.2"
+serde = { version = "1.0.229", features = ["derive"] }
+tokio = { version = "1.53.1", features = ["macros", "rt-multi-thread"] }
