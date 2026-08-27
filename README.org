@@ -70,3 +70,87 @@ Diagnosis Agent     ✅              Suggest causes and investigations
 Reporter Agent      ✅              Generate a clear report
 Orchestrator        ❌ initially    Coordinate the workflow
 #+end_src
+
+** Log Analyzer Agent
+His role:
++ Analyze a set of logs and identify significant events.
+** Correlator Agent
+He asks the question:
++ Are these events related?
+#+begin_src emacs-lisp
+LogAnalyzer
+     │
+     │ Vec<DetectedEvent>
+     ▼
+Correlator
+     │
+     │ Incident
+     ▼
+...
+#+end_src
+** Severity Agent
+He responds only to:
++ How serious is this incident?
+** Diagnosis Agent
+He receives:
++ Incident
++ Severity Assessment
+and looking for
+#+begin_src emacs-lisp
+POSSIBLE CAUSES
+       │
+       ├── SSH brute force attack
+       ├── compromised password
+       └── possible false positive
+
+INVESTIGATIONS
+       │
+       ├── check /var/log/auth.log
+       ├── check “last”
+       ├── look up source IP
+       └── check sudo commands
+
+RECOMMENDATIONS
+       │
+       ├── check the SSH key
+       ├── disable password authentication
+       └── temporarily block the IP
+#+end_src
+** Reporter Agent
+Input
++ Incident
++ Severity Assessment
++ Diagnosis
+and the result (for example)
+#+begin_src emacs-lisp
+====================================================
+INCIDENT REPORT
+====================================================
+
+Severity: HIGH
+
+Incident:
+Suspicious SSH authentication activity
+
+Summary:
+Multiple failed login attempts originating from
+192.168.1.52 were followed by a successful login.
+
+Evidence:
+
+  13:41 failed root login
+  13:42 failed root login
+  13:42 failed admin login
+  13:44 successful spike login
+
+Possible cause:
+
+  SSH brute force followed by successful compromise.
+
+Recommended investigations:
+
+  - inspect last
+  - inspect sudo logs
+  - inspect running processes
+  - verify the source IP
+#+end_src
