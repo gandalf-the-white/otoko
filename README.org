@@ -1,0 +1,72 @@
+#+title: Syslog AI on FreeBSD
+* Introduction
+Just to brainstorm about a multi-agent system conception thank to AI. The idea is to analyze different logs from a /FreeBSD/ server using /jails/ as architecture.
+* Architecture
+#+begin_src emacs-lisp
+                    SERVEUR FREEBSD
+                 192.168.1.100
+                         │
+                         │ SSH
+                         ▼
+              ┌─────────────────────┐
+              │   Log Collector     │
+              │      Rust           │
+              └──────────┬──────────┘
+                         │
+                         ▼
+              ┌─────────────────────┐
+              │ Log Normalizer      │
+              │      Rust           │
+              └──────────┬──────────┘
+                         │
+                         ▼
+                    LogBatch
+                         │
+                         ▼
+              ┌─────────────────────┐
+              │ Log Analyzer Agent  │
+              │       Rig + LLM     │
+              └──────────┬──────────┘
+                         │
+                    LogAnalysis
+                         │
+                         ▼
+              ┌─────────────────────┐
+              │ Correlator Agent    │
+              │       Rig + LLM     │
+              └──────────┬──────────┘
+                         │
+                       Incident
+                         │
+             ┌───────────┴───────────┐
+             ▼                       ▼
+    ┌─────────────────┐     ┌─────────────────┐
+    │ Severity Agent  │     │ Diagnosis Agent │
+    │    Rig + LLM    │     │    Rig + LLM    │
+    └────────┬────────┘     └────────┬────────┘
+             │                       │
+             └───────────┬───────────┘
+                         ▼
+              ┌─────────────────────┐
+              │ Reporter Agent      │
+              │     Rig + LLM       │
+              └──────────┬──────────┘
+                         │
+                         ▼
+                  IncidentReport
+#+end_src
+* Functions
+** Summary
+Just to break down the platform into six main areas of responsibility, 4 of which actually use an /LLM/.
+
+#+begin_src emacs-lisp
+Component           AI              Responsibility
+Collector           ❌              Collect FreeBSD logs
+Normalizer          ❌              Convert logs into Rust structures
+Log Analyzer Agent  ✅              Analyze each group of logs
+Correlator Agent    ✅              Detect related events
+Severity Agent      ✅/optional     Assess severity
+Diagnosis Agent     ✅              Suggest causes and investigations
+Reporter Agent      ✅              Generate a clear report
+Orchestrator        ❌ initially    Coordinate the workflow
+#+end_src
