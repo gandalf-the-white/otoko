@@ -1,10 +1,11 @@
 use otoko::{
     agents::{AnalyzeLogs, OllamaLogAnalyzer},
     collector::{FakeLogSource, LogScenario, LogSource},
+    config::AnalyzerConfig,
     normalizer::{LogNormalizer, SyslogNormalizer},
 };
 
-const MODEL: &str = "qwen3.6:latest";
+const MODEL: &str = "qwen3.8:latest";
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -49,6 +50,7 @@ async fn main() -> anyhow::Result<()> {
     // }
 
     // ------------------------------------------
+    tracing_subscriber::fmt().with_target(false).init();
 
     let source = FakeLogSource::from_scenario(LogScenario::SshBruteForce);
 
@@ -58,9 +60,9 @@ async fn main() -> anyhow::Result<()> {
 
     let batch = normalizer.normalize(&raw_logs)?;
 
-    println!("{} log entries normalized", batch.len());
+    let config = AnalyzerConfig::new(MODEL);
 
-    let analyzer = OllamaLogAnalyzer::new(MODEL)?;
+    let analyzer = OllamaLogAnalyzer::new(config)?;
 
     let analysis = analyzer.analyze(&batch).await?;
 

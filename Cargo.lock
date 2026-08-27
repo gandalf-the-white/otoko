@@ -4304,7 +4304,10 @@ dependencies = [
  "rig",
  "schemars 1.2.2",
  "serde",
+ "thiserror",
  "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
