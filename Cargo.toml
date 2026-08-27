@@ -2,6 +2,7 @@
 name = "otoko"
 version = "0.1.0"
 edition = "2024"
+authors = ["gandalf-the-white <gandalf_the_white@orange.fr>"]
 
 [dependencies]
 anyhow = "1.0.104"
