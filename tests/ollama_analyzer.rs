@@ -8,7 +8,6 @@ use otoko::{
 
 #[tokio::test]
 async fn empty_batch_returns_empty_analysis() {
-    // let analyzer = OllamaLogAnalyzer::new("qwen3.6:latest").expect("agent creation should succeed");
     let config = AnalyzerConfig::new("qwen3.8");
 
     let analyzer = OllamaLogAnalyzer::new(config).expect("agent creation should succeed");
@@ -38,7 +37,6 @@ async fn ollama_detects_ssh_authentication_event() {
         .normalize(&raw_logs)
         .expect("normalization should succeed");
 
-    // let analyzer = OllamaLogAnalyzer::new("qwen3.6:latest").expect("agent should be created");
     let config = AnalyzerConfig::new("qwen3.8");
 
     let analyzer = OllamaLogAnalyzer::new(config).expect("agent creation should succeed");
@@ -73,7 +71,6 @@ async fn ollama_does_not_flag_normal_logs_as_security_incident() {
         .normalize(&raw_logs)
         .expect("normalization should succeed");
 
-    // let analyzer = OllamaLogAnalyzer::new("qwen3.6:latest").expect("agent should be created");
     let config = AnalyzerConfig::new("qwen3.8");
 
     let analyzer = OllamaLogAnalyzer::new(config).expect("agent creation should succeed");

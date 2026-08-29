@@ -1,7 +1,7 @@
 use otoko::{
-    agents::{AnalyzeLogs, OllamaLogAnalyzer},
+    agents::{AnalyzeLogs, CorrelateEvents, OllamaCorrelator, OllamaLogAnalyzer},
     collector::{FakeLogSource, LogScenario, LogSource},
-    config::AnalyzerConfig,
+    config::{AnalyzerConfig, CorrelatorConfig},
     normalizer::{LogNormalizer, SyslogNormalizer},
 };
 
@@ -50,6 +50,27 @@ async fn main() -> anyhow::Result<()> {
     // }
 
     // ------------------------------------------
+
+    // tracing_subscriber::fmt().with_target(false).init();
+
+    // let source = FakeLogSource::from_scenario(LogScenario::SshBruteForce);
+
+    // let raw_logs = source.collect()?;
+
+    // let normalizer = SyslogNormalizer::new(2026);
+
+    // let batch = normalizer.normalize(&raw_logs)?;
+
+    // let config = AnalyzerConfig::new(MODEL);
+
+    // let analyzer = OllamaLogAnalyzer::new(config)?;
+
+    // let analysis = analyzer.analyze(&batch).await?;
+
+    // println!("{:#?}", analysis);
+
+    // ------------------------------------------
+
     tracing_subscriber::fmt().with_target(false).init();
 
     let source = FakeLogSource::from_scenario(LogScenario::SshBruteForce);
@@ -60,13 +81,15 @@ async fn main() -> anyhow::Result<()> {
 
     let batch = normalizer.normalize(&raw_logs)?;
 
-    let config = AnalyzerConfig::new(MODEL);
+    let analyzer = OllamaLogAnalyzer::new(AnalyzerConfig::new(MODEL))?;
 
-    let analyzer = OllamaLogAnalyzer::new(config)?;
+    let correlator = OllamaCorrelator::new(CorrelatorConfig::new(MODEL))?;
 
     let analysis = analyzer.analyze(&batch).await?;
 
-    println!("{:#?}", analysis);
+    let incidents = correlator.correlate(&analysis).await?;
+
+    println!("{incidents:#?}");
 
     Ok(())
 }

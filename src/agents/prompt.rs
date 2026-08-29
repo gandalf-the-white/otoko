@@ -1,7 +1,7 @@
 use anyhow::Result;
 use rig::serde_json;
 
-use crate::domain::LogBatch;
+use crate::domain::{LogAnalysis, LogBatch};
 
 pub const ANALYZER_PREAMBLE: &str = r#"
 You are a system log analysis agent specialized in FreeBSD systems.
@@ -24,6 +24,30 @@ Rules:
 - If no significant event is present, return an empty event list.
 "#;
 
+pub const CORRELATOR_PREAMBLE: &str = r#"
+You are an incident correlation agent.
+
+You receive a numbered list of already detected system events.
+
+Your only responsibility is to determine which existing events
+belong to the same incident.
+
+Rules:
+
+- Do not create new events.
+- Do not modify events.
+- Refer to events only by their supplied numeric indices.
+- Never use an index that is not present in the input.
+- Include each event at most once in an incident.
+- An incident must contain at least one event.
+- Do not assign severity.
+- Do not diagnose root causes.
+- Do not recommend remediation.
+- Keep the explanation concise and grounded in the supplied events.
+- If events are unrelated, they may form separate incidents.
+- If the input contains no events, return an empty incident list.
+"#;
+
 pub fn build_analyzer_prompt(batch: &LogBatch) -> Result<String> {
     let logs = serde_json::to_string_pretty(&batch.entries)?;
 
@@ -32,11 +56,33 @@ pub fn build_analyzer_prompt(batch: &LogBatch) -> Result<String> {
     ))
 }
 
+pub fn build_correlator_prompt(analysis: &LogAnalysis) -> Result<String> {
+    let events = analysis
+        .events
+        .iter()
+        .enumerate()
+        .map(|(index, event)| {
+            format!(
+                "Event {}\nCategory: {:?}\nSummary: {}\nEvidence: {}\n",
+                index,
+                event.category,
+                event.summary,
+                event.evidence.join(" | "),
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    Ok(format!(
+        "Correlate the following detected events into incidents:\n\n{events}"
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use chrono::{TimeZone, Utc};
 
-    use crate::domain::{LogBatch, LogEntry};
+    use crate::domain::{DetectedEvent, EventCategory, LogBatch, LogEntry};
 
     use super::*;
 
@@ -59,5 +105,37 @@ mod tests {
         assert!(prompt.contains("sshd"));
 
         assert!(prompt.contains("freebsd"));
+    }
+
+    #[test]
+    fn correlator_prompt_numbers_events() {
+        let analysis = LogAnalysis {
+            events: vec![
+                DetectedEvent {
+                    category: EventCategory::Authentication,
+
+                    summary: "SSH failures".into(),
+
+                    evidence: vec!["failure".into()],
+                },
+                DetectedEvent {
+                    category: EventCategory::Security,
+
+                    summary: "sudo activity".into(),
+
+                    evidence: vec!["sudo".into()],
+                },
+            ],
+        };
+
+        let prompt = build_correlator_prompt(&analysis).expect("prompt should be built");
+
+        assert!(prompt.contains("Event 0"));
+
+        assert!(prompt.contains("Event 1"));
+
+        assert!(prompt.contains("SSH failures"));
+
+        assert!(prompt.contains("sudo activity"));
     }
 }
