@@ -33,7 +33,7 @@ async fn correlator_groups_related_ssh_events() {
         ],
     };
 
-    let config = CorrelatorConfig::new("qwen3:8b");
+    let config = CorrelatorConfig::new("qwen3:8");
 
     let correlator = OllamaCorrelator::new(config).expect("correlator should be created");
 
