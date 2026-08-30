@@ -1,7 +1,10 @@
 use otoko::{
-    agents::{AnalyzeLogs, CorrelateEvents, OllamaCorrelator, OllamaLogAnalyzer},
+    agents::{
+        AnalyzeLogs, AssessSeverity, CorrelateEvents, OllamaCorrelator, OllamaLogAnalyzer,
+        OllamaSeverityAgent,
+    },
     collector::{FakeLogSource, LogScenario, LogSource},
-    config::{AnalyzerConfig, CorrelatorConfig},
+    config::{AnalyzerConfig, CorrelatorConfig, SeverityConfig},
     normalizer::{LogNormalizer, SyslogNormalizer},
 };
 
@@ -71,9 +74,31 @@ async fn main() -> anyhow::Result<()> {
 
     // ------------------------------------------
 
+    // tracing_subscriber::fmt().with_target(false).init();
+
+    // let source = FakeLogSource::from_scenario(LogScenario::SuspiciousSshSession);
+
+    // let raw_logs = source.collect()?;
+
+    // let normalizer = SyslogNormalizer::new(2026);
+
+    // let batch = normalizer.normalize(&raw_logs)?;
+
+    // let analyzer = OllamaLogAnalyzer::new(AnalyzerConfig::new(MODEL))?;
+
+    // let correlator = OllamaCorrelator::new(CorrelatorConfig::new(MODEL))?;
+
+    // let analysis = analyzer.analyze(&batch).await?;
+
+    // let incidents = correlator.correlate(&analysis).await?;
+
+    // println!("{incidents:#?}");
+
+    // ------------------------------------------
+
     tracing_subscriber::fmt().with_target(false).init();
 
-    let source = FakeLogSource::from_scenario(LogScenario::SshBruteForce);
+    let source = FakeLogSource::from_scenario(LogScenario::SuspiciousSshSession);
 
     let raw_logs = source.collect()?;
 
@@ -89,7 +114,19 @@ async fn main() -> anyhow::Result<()> {
 
     let incidents = correlator.correlate(&analysis).await?;
 
-    println!("{incidents:#?}");
+    let severity_agent = OllamaSeverityAgent::new(SeverityConfig::new(MODEL))?;
+
+    for incident in &incidents {
+        let assessment = severity_agent.assess(incident).await?;
+
+        println!("Incident: {}", incident.title);
+
+        println!("Severity: {:?}", assessment.severity);
+
+        println!("Confidence: {:.2}", assessment.confidence);
+
+        println!("Justification: {}", assessment.justification);
+    }
 
     Ok(())
 }

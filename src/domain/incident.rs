@@ -10,22 +10,6 @@ pub struct Incident {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Severity {
-    Info,
-    Low,
-    Medium,
-    High,
-    Critical,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct SeverityAssessment {
-    pub severity: Severity,
-    pub confidence: f32,
-    pub justification: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Diagnosis {
     pub probable_causes: Vec<String>,
     pub investigations: Vec<String>,

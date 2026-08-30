@@ -1,7 +1,7 @@
 use anyhow::Result;
 use rig::serde_json;
 
-use crate::domain::{LogAnalysis, LogBatch};
+use crate::domain::{Incident, LogAnalysis, LogBatch};
 
 pub const ANALYZER_PREAMBLE: &str = r#"
 You are a system log analysis agent specialized in FreeBSD systems.
@@ -48,6 +48,48 @@ Rules:
 - If the input contains no events, return an empty incident list.
 "#;
 
+pub const SEVERITY_PREAMBLE: &str = r#"
+You are an incident severity assessment agent specialized in
+FreeBSD system incidents.
+
+Your only responsibility is to assess the severity of the supplied
+incident.
+
+Severity levels:
+
+- Informational:
+  Expected or routine activity with no meaningful operational or
+  security impact.
+
+- Low:
+  Minor anomaly with limited impact and no clear indication of
+  significant degradation or security risk.
+
+- Medium:
+  Meaningful anomaly that deserves investigation but does not
+  currently demonstrate major impact.
+
+- High:
+  Strong indication of significant operational impact or suspicious
+  security activity requiring prompt attention.
+
+- Critical:
+  Clear evidence of severe service disruption, data loss, or
+  immediately dangerous security impact.
+
+Rules:
+
+- Base the assessment only on the supplied incident.
+- Do not invent evidence.
+- Do not diagnose root causes.
+- Do not recommend remediation.
+- Do not modify the incident or its events.
+- Confidence must be a number between 0.0 and 1.0 inclusive.
+- Confidence expresses confidence in the severity classification,
+  not the severity itself.
+- Keep the justification concise.
+"#;
+
 pub fn build_analyzer_prompt(batch: &LogBatch) -> Result<String> {
     let logs = serde_json::to_string_pretty(&batch.entries)?;
 
@@ -75,6 +117,14 @@ pub fn build_correlator_prompt(analysis: &LogAnalysis) -> Result<String> {
 
     Ok(format!(
         "Correlate the following detected events into incidents:\n\n{events}"
+    ))
+}
+
+pub fn build_severity_prompt(incident: &Incident) -> Result<String> {
+    let incident = serde_json::to_string_pretty(incident)?;
+
+    Ok(format!(
+        "Assess the severity of the following incident:\n\n{incident}"
     ))
 }
 
@@ -137,5 +187,30 @@ mod tests {
         assert!(prompt.contains("SSH failures"));
 
         assert!(prompt.contains("sudo activity"));
+    }
+
+    #[test]
+    fn severity_prompt_contains_incident_information() {
+        let incident = Incident {
+            title: "Suspicious SSH session".into(),
+
+            events: vec![DetectedEvent {
+                category: EventCategory::Authentication,
+
+                summary: "Repeated SSH failures".into(),
+
+                evidence: vec!["Failed password for spike".into()],
+            }],
+
+            explanation: "Related authentication activity".into(),
+        };
+
+        let prompt = build_severity_prompt(&incident).expect("prompt should be built");
+
+        assert!(prompt.contains("Suspicious SSH session"));
+
+        assert!(prompt.contains("Repeated SSH failures"));
+
+        assert!(prompt.contains("Failed password for spike"));
     }
 }
