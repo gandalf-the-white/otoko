@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::domain::Diagnosis;
+
 use super::{Incident, LogAnalysis, SeverityAssessment};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -11,5 +13,11 @@ pub struct AssessedIncident {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AnalysisResult {
     pub analysis: LogAnalysis,
-    pub incidents: Vec<AssessedIncident>,
+    pub incidents: Vec<DiagnosedIncident>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DiagnosedIncident {
+    pub assessed: AssessedIncident,
+    pub diagnosis: Diagnosis,
 }

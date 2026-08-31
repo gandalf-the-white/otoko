@@ -1,103 +1,162 @@
-use std::sync::Arc;
-
 use anyhow::Result;
 
-use tokio::{sync::Semaphore, task::JoinSet};
+use futures::future::try_join_all;
+use tokio::sync::Semaphore;
 
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::{
-    agents::{AnalyzeLogs, AssessSeverity, CorrelateEvents},
+    agents::{AnalyzeLogs, AssessSeverity, CorrelateEvents, DiagnoseIncident},
     config::PipelineConfig,
-    domain::{AnalysisResult, AssessedIncident, Incident, LogBatch},
+    domain::{AnalysisResult, AssessedIncident, DiagnosedIncident, Incident, LogBatch},
 };
 
-pub struct AnalysisPipeline {
-    analyzer: Arc<dyn AnalyzeLogs>,
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum PipelineError {
+    #[error("max_concurrent_severity_assessments must be greater than zero")]
+    InvalidConcurrencyLimit,
 
-    correlator: Arc<dyn CorrelateEvents>,
+    #[error("max_concurrent_diagnoses must be greater than zero")]
+    InvalidDiagnosisConcurrencyLimit,
+}
 
-    severity_agent: Arc<dyn AssessSeverity>,
-
+pub struct AnalysisPipeline<A, C, S, D> {
+    analyzer: A,
+    correlator: C,
+    severity: S,
+    diagnosis: D,
     config: PipelineConfig,
 }
 
-impl AnalysisPipeline {
+impl<A, C, S, D> AnalysisPipeline<A, C, S, D> {
     pub fn new(
-        analyzer: Arc<dyn AnalyzeLogs>,
-
-        correlator: Arc<dyn CorrelateEvents>,
-
-        severity_agent: Arc<dyn AssessSeverity>,
-
+        analyzer: A,
+        correlator: C,
+        severity: S,
+        diagnosis: D,
         config: PipelineConfig,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, PipelineError> {
+        if config.max_concurrent_severity_assessments == 0 {
+            return Err(PipelineError::InvalidConcurrencyLimit);
+        }
+
+        if config.max_concurrent_diagnoses == 0 {
+            return Err(PipelineError::InvalidDiagnosisConcurrencyLimit);
+        }
+
+        Ok(Self {
             analyzer,
             correlator,
-            severity_agent,
+            severity,
+            diagnosis,
             config,
-        }
+        })
     }
+}
 
+impl<A, C, S, D> AnalysisPipeline<A, C, S, D>
+where
+    A: AnalyzeLogs + Sync,
+    C: CorrelateEvents + Sync,
+    S: AssessSeverity + Sync,
+    D: DiagnoseIncident + Sync,
+{
     pub async fn run(&self, batch: &LogBatch) -> Result<AnalysisResult> {
-        info!(log_count = batch.len(), "starting analysis pipeline");
+        info!(log_count = batch.len(), "analysis pipeline started");
 
         let analysis = self.analyzer.analyze(batch).await?;
 
+        info!(
+            event_count = analysis.events.len(),
+            "log analysis completed"
+        );
+
         let incidents = self.correlator.correlate(&analysis).await?;
 
-        info!(incident_count = incidents.len(), "incidents correlated");
+        info!(
+            incident_count = incidents.len(),
+            "incident correlation completed"
+        );
 
-        let incidents = self.assess_incidents(incidents).await?;
+        let assessed_incidents = self.assess_incidents(incidents).await?;
 
         info!(
-            assessed_incident_count = incidents.len(),
-            "analysis pipeline completed"
+            assessed_incident_count = assessed_incidents.len(),
+            "severity assessments completed"
+        );
+
+        let diagnosed_incidents = self.diagnose_incidents(assessed_incidents).await?;
+
+        info!(
+            diagnosed_incident_count = diagnosed_incidents.len(),
+            "diagnosis completed"
         );
 
         Ok(AnalysisResult {
             analysis,
-            incidents,
+            incidents: diagnosed_incidents,
         })
     }
 
     async fn assess_incidents(&self, incidents: Vec<Incident>) -> Result<Vec<AssessedIncident>> {
-        let semaphore = Arc::new(Semaphore::new(self.config.max_concurrent_severity));
+        debug!(
+            incident_count = incidents.len(),
+            concurrency_limit = self.config.max_concurrent_severity_assessments,
+            "starting concurrent severity assessments"
+        );
 
-        let mut tasks = JoinSet::new();
+        let semaphore = Semaphore::new(self.config.max_concurrent_severity_assessments);
 
-        for (index, incident) in incidents.into_iter().enumerate() {
-            let severity_agent = Arc::clone(&self.severity_agent);
+        let futures = incidents.into_iter().map(|incident| {
+            let semaphore = &semaphore;
 
-            let semaphore = Arc::clone(&semaphore);
+            let severity = &self.severity;
 
-            tasks.spawn(async move {
-                let _permit = semaphore.acquire_owned().await?;
+            async move {
+                let _permit = semaphore.acquire().await?;
 
-                let assessment = severity_agent.assess(&incident).await?;
+                let assessment = severity.assess(&incident).await?;
 
-                Ok::<_, anyhow::Error>((
-                    index,
-                    AssessedIncident {
-                        incident,
+                Ok::<AssessedIncident, anyhow::Error>(AssessedIncident {
+                    incident,
+                    severity: assessment,
+                })
+            }
+        });
 
-                        severity: assessment,
-                    },
-                ))
-            });
-        }
+        try_join_all(futures).await
+    }
 
-        let mut results = Vec::new();
+    async fn diagnose_incidents(
+        &self,
+        incidents: Vec<AssessedIncident>,
+    ) -> Result<Vec<DiagnosedIncident>> {
+        debug!(
+            incident_count = incidents.len(),
+            concurrency_limit = self.config.max_concurrent_diagnoses,
+            "starting concurrent diagnoses"
+        );
 
-        while let Some(task_result) = tasks.join_next().await {
-            let result = task_result??;
+        let semaphore = Semaphore::new(self.config.max_concurrent_diagnoses);
 
-            results.push(result);
-        }
+        let futures = incidents.into_iter().map(|incident| {
+            let semaphore = &semaphore;
 
-        results.sort_by_key(|(index, _)| *index);
+            let diagnosis = &self.diagnosis;
 
-        Ok(results.into_iter().map(|(_, incident)| incident).collect())
+            async move {
+                let _permit = semaphore.acquire().await?;
+
+                let result = diagnosis.diagnose(&incident).await?;
+
+                Ok::<DiagnosedIncident, anyhow::Error>(DiagnosedIncident {
+                    assessed: incident,
+
+                    diagnosis: result,
+                })
+            }
+        });
+
+        try_join_all(futures).await
     }
 }

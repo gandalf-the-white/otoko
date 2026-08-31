@@ -9,9 +9,9 @@ pub struct Incident {
     pub explanation: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Diagnosis {
-    pub probable_causes: Vec<String>,
-    pub investigations: Vec<String>,
-    pub recommendations: Vec<String>,
-}
+// #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+// pub struct Diagnosis {
+//     pub probable_causes: Vec<String>,
+//     pub investigations: Vec<String>,
+//     pub recommendations: Vec<String>,
+// }

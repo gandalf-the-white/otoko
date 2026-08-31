@@ -8,6 +8,7 @@ authors = ["gandalf-the-white <gandalf_the_white@orange.fr>"]
 anyhow = "1.0.104"
 async-trait = "0.1.92"
 chrono = { version = "0.4.45", features = ["serde"] }
+futures = "0.3.34"
 rig = "0.42.0"
 schemars = "1.2.2"
 serde = { version = "1.0.229", features = ["derive"] }

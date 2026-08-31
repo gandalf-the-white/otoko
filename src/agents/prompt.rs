@@ -1,7 +1,7 @@
 use anyhow::Result;
 use rig::serde_json;
 
-use crate::domain::{Incident, LogAnalysis, LogBatch};
+use crate::domain::{AssessedIncident, Incident, LogAnalysis, LogBatch};
 
 pub const ANALYZER_PREAMBLE: &str = r#"
 You are a system log analysis agent specialized in FreeBSD systems.
@@ -90,6 +90,39 @@ Rules:
 - Keep the justification concise.
 "#;
 
+pub const DIAGNOSIS_PREAMBLE: &str = r#"
+You are a diagnostic reasoning agent specialized in FreeBSD systems.
+
+Your responsibility is to propose plausible causes, useful
+investigations, and safe recommendations for the supplied incident.
+
+Important distinction:
+
+- Evidence describes what is directly supported by the incident.
+- A probable cause is a hypothesis, not a proven fact.
+- An investigation is a read-only action intended to gather
+  additional information.
+- A recommendation is advice and must never be represented as an
+  action that has already been performed.
+
+Rules:
+
+- Base your reasoning only on the supplied incident.
+- Do not invent logs, commands, files, users, IP addresses, services,
+  processes, or system state.
+- Never present a hypothesis as a proven fact.
+- If there is insufficient evidence for a probable cause, return no
+  probable causes.
+- Prefer investigations that could confirm or reject hypotheses.
+- Investigations must be read-only and non-destructive.
+- Do not claim that an investigation has been performed.
+- Do not claim that a recommendation has been executed.
+- Do not assume the system is compromised unless the supplied
+  evidence establishes it.
+- Confidence must be between 0.0 and 1.0 inclusive.
+- Keep descriptions concise and operationally useful.
+"#;
+
 pub fn build_analyzer_prompt(batch: &LogBatch) -> Result<String> {
     let logs = serde_json::to_string_pretty(&batch.entries)?;
 
@@ -128,11 +161,29 @@ pub fn build_severity_prompt(incident: &Incident) -> Result<String> {
     ))
 }
 
+pub fn build_diagnosis_prompt(incident: &AssessedIncident) -> Result<String> {
+    let incident = serde_json::to_string_pretty(incident)?;
+
+    Ok(format!(
+        "\
+Diagnose the following assessed incident.
+
+Remember that probable causes are hypotheses and must not be \
+presented as established facts.
+
+Assessed incident:
+
+{incident}"
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use chrono::{TimeZone, Utc};
 
-    use crate::domain::{DetectedEvent, EventCategory, LogBatch, LogEntry};
+    use crate::domain::{
+        DetectedEvent, EventCategory, LogBatch, LogEntry, Severity, SeverityAssessment,
+    };
 
     use super::*;
 
@@ -212,5 +263,34 @@ mod tests {
         assert!(prompt.contains("Repeated SSH failures"));
 
         assert!(prompt.contains("Failed password for spike"));
+    }
+
+    #[test]
+    fn diagnosis_prompt_contains_assessed_incident() {
+        let incident = AssessedIncident {
+            incident: Incident {
+                title: "Suspicious SSH activity".into(),
+
+                events: Vec::new(),
+
+                explanation: "Authentication anomalies".into(),
+            },
+
+            severity: SeverityAssessment {
+                severity: Severity::High,
+
+                confidence: 0.9,
+
+                justification: "Suspicious sequence".into(),
+            },
+        };
+
+        let prompt = build_diagnosis_prompt(&incident).expect("prompt should be built");
+
+        assert!(prompt.contains("Suspicious SSH activity"));
+
+        assert!(prompt.contains("Authentication anomalies"));
+
+        assert!(prompt.contains("High"));
     }
 }

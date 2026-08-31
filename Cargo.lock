@@ -4301,6 +4301,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
+ "futures",
  "rig",
  "schemars 1.2.2",
  "serde",

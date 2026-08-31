@@ -1,57 +1,25 @@
-#[derive(Debug, thiserror::Error, PartialEq, Eq)]
-pub enum PipelineConfigError {
-    #[error("max_concurrent_severity must be greater than zero")]
-    ZeroConcurrency,
-}
+// #[derive(Debug, thiserror::Error, PartialEq, Eq)]
+// pub enum PipelineConfigError {
+//     #[error("max_concurrent_severity must be greater than zero")]
+//     ZeroConcurrency,
+// }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PipelineConfig {
-    pub max_concurrent_severity: usize,
-}
+    pub max_concurrent_severity_assessments: usize,
 
-// impl PipelineConfig {
-//     pub fn new(max_concurrent_severity: usize) -> Self {
-//         Self {
-//             max_concurrent_severity,
-//         }
-//     }
-// }
+    pub max_concurrent_diagnoses: usize,
+}
 
 impl PipelineConfig {
-    pub fn new(max_concurrent_severity: usize) -> Result<Self, PipelineConfigError> {
-        if max_concurrent_severity == 0 {
-            return Err(PipelineConfigError::ZeroConcurrency);
-        }
+    pub fn new(
+        max_concurrent_severity_assessments: usize,
 
-        Ok(Self {
-            max_concurrent_severity,
-        })
-    }
-}
-
-impl Default for PipelineConfig {
-    fn default() -> Self {
+        max_concurrent_diagnoses: usize,
+    ) -> Self {
         Self {
-            max_concurrent_severity: 2,
+            max_concurrent_severity_assessments,
+            max_concurrent_diagnoses,
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn pipeline_rejects_zero_concurrency() {
-        let result = PipelineConfig::new(0);
-
-        assert!(matches!(result, Err(PipelineConfigError::ZeroConcurrency)));
-    }
-
-    #[test]
-    fn pipeline_accepts_positive_concurrency() {
-        let config = PipelineConfig::new(3).expect("3 should be valid");
-
-        assert_eq!(config.max_concurrent_severity, 3);
     }
 }
