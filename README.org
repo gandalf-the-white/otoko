@@ -55,7 +55,7 @@ Just to brainstorm about a multi-agent system conception thank to AI. The idea i
                          ▼
                   IncidentReport
 #+end_src
-* Organisation
+* Organization
 #+begin_src emacs-lisp
 otoko/
 │
