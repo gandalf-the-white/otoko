@@ -1,0 +1,15 @@
+use serde::{Deserialize, Serialize};
+
+use super::{Incident, LogAnalysis, SeverityAssessment};
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AssessedIncident {
+    pub incident: Incident,
+    pub severity: SeverityAssessment,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AnalysisResult {
+    pub analysis: LogAnalysis,
+    pub incidents: Vec<AssessedIncident>,
+}

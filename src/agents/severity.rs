@@ -3,7 +3,12 @@ use async_trait::async_trait;
 
 use crate::domain::{Incident, SeverityAssessment};
 
+// #[async_trait]
+// pub trait AssessSeverity {
+//     async fn assess(&self, incident: &Incident) -> Result<SeverityAssessment>;
+// }
+
 #[async_trait]
-pub trait AssessSeverity {
+pub trait AssessSeverity: Send + Sync {
     async fn assess(&self, incident: &Incident) -> Result<SeverityAssessment>;
 }

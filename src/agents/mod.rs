@@ -26,7 +26,12 @@ pub use severity::AssessSeverity;
 pub use severity_validator::{SeverityValidationError, SeverityValidator};
 pub use validator::{EvidenceValidationError, EvidenceValidator};
 
+// #[async_trait]
+// pub trait AnalyzeLogs {
+//     async fn analyze(&self, batch: &LogBatch) -> Result<LogAnalysis>;
+// }
+
 #[async_trait]
-pub trait AnalyzeLogs {
+pub trait AnalyzeLogs: Send + Sync {
     async fn analyze(&self, batch: &LogBatch) -> Result<LogAnalysis>;
 }

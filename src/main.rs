@@ -1,11 +1,11 @@
+use std::sync::Arc;
+
 use otoko::{
-    agents::{
-        AnalyzeLogs, AssessSeverity, CorrelateEvents, OllamaCorrelator, OllamaLogAnalyzer,
-        OllamaSeverityAgent,
-    },
+    agents::{OllamaCorrelator, OllamaLogAnalyzer, OllamaSeverityAgent},
     collector::{FakeLogSource, LogScenario, LogSource},
-    config::{AnalyzerConfig, CorrelatorConfig, SeverityConfig},
+    config::{AnalyzerConfig, CorrelatorConfig, PipelineConfig, SeverityConfig},
     normalizer::{LogNormalizer, SyslogNormalizer},
+    orchestration::AnalysisPipeline,
 };
 
 const MODEL: &str = "qwen3.8:latest";
@@ -96,6 +96,40 @@ async fn main() -> anyhow::Result<()> {
 
     // ------------------------------------------
 
+    // tracing_subscriber::fmt().with_target(false).init();
+
+    // let source = FakeLogSource::from_scenario(LogScenario::SuspiciousSshSession);
+
+    // let raw_logs = source.collect()?;
+
+    // let normalizer = SyslogNormalizer::new(2026);
+
+    // let batch = normalizer.normalize(&raw_logs)?;
+
+    // let analyzer = OllamaLogAnalyzer::new(AnalyzerConfig::new(MODEL))?;
+
+    // let correlator = OllamaCorrelator::new(CorrelatorConfig::new(MODEL))?;
+
+    // let analysis = analyzer.analyze(&batch).await?;
+
+    // let incidents = correlator.correlate(&analysis).await?;
+
+    // let severity_agent = OllamaSeverityAgent::new(SeverityConfig::new(MODEL))?;
+
+    // for incident in &incidents {
+    //     let assessment = severity_agent.assess(incident).await?;
+
+    //     println!("Incident: {}", incident.title);
+
+    //     println!("Severity: {:?}", assessment.severity);
+
+    //     println!("Confidence: {:.2}", assessment.confidence);
+
+    //     println!("Justification: {}", assessment.justification);
+    // }
+
+    // ------------------------------------------
+
     tracing_subscriber::fmt().with_target(false).init();
 
     let source = FakeLogSource::from_scenario(LogScenario::SuspiciousSshSession);
@@ -106,27 +140,22 @@ async fn main() -> anyhow::Result<()> {
 
     let batch = normalizer.normalize(&raw_logs)?;
 
-    let analyzer = OllamaLogAnalyzer::new(AnalyzerConfig::new(MODEL))?;
+    let analyzer = Arc::new(OllamaLogAnalyzer::new(AnalyzerConfig::new(MODEL))?);
 
-    let correlator = OllamaCorrelator::new(CorrelatorConfig::new(MODEL))?;
+    let correlator = Arc::new(OllamaCorrelator::new(CorrelatorConfig::new(MODEL))?);
 
-    let analysis = analyzer.analyze(&batch).await?;
+    let severity_agent = Arc::new(OllamaSeverityAgent::new(SeverityConfig::new(MODEL))?);
 
-    let incidents = correlator.correlate(&analysis).await?;
+    let pipeline = AnalysisPipeline::new(
+        analyzer,
+        correlator,
+        severity_agent,
+        PipelineConfig::new(2)?,
+    );
 
-    let severity_agent = OllamaSeverityAgent::new(SeverityConfig::new(MODEL))?;
+    let result = pipeline.run(&batch).await?;
 
-    for incident in &incidents {
-        let assessment = severity_agent.assess(incident).await?;
-
-        println!("Incident: {}", incident.title);
-
-        println!("Severity: {:?}", assessment.severity);
-
-        println!("Confidence: {:.2}", assessment.confidence);
-
-        println!("Justification: {}", assessment.justification);
-    }
+    println!("{result:#?}");
 
     Ok(())
 }

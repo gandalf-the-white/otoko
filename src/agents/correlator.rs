@@ -7,8 +7,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::{Incident, LogAnalysis};
 
+// #[async_trait]
+// pub trait CorrelateEvents {
+//     async fn correlate(&self, analysis: &LogAnalysis) -> Result<Vec<Incident>>;
+// }
+
 #[async_trait]
-pub trait CorrelateEvents {
+pub trait CorrelateEvents: Send + Sync {
     async fn correlate(&self, analysis: &LogAnalysis) -> Result<Vec<Incident>>;
 }
 
