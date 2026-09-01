@@ -2,116 +2,139 @@
 * Introduction
 Just to brainstorm about a multi-agent system conception thank to AI. The idea is to analyze different logs from a /FreeBSD/ server using /jails/ as architecture.
 * Architecture
-#+begin_src emacs-lisp
-                 SERVEUR FREEBSD
-                  192.168.1.100
-                         │
-                         │ SSH
-                         ▼
-              ┌─────────────────────┐
-              │   Log Collector     │
-              │      Rust           │
-              └──────────┬──────────┘
-                         │
-                         ▼
-              ┌─────────────────────┐
-              │ Log Normalizer      │
-              │      Rust           │
-              └──────────┬──────────┘
-                         │
-                         ▼
-                    LogBatch
-                         │
-                         ▼
-              ┌─────────────────────┐
-              │ Log Analyzer Agent  │
-              │       Rig + LLM     │
-              └──────────┬──────────┘
-                         │
-                    LogAnalysis
-                         │
-                         ▼
-              ┌─────────────────────┐
-              │ Correlator Agent    │
-              │       Rig + LLM     │
-              └──────────┬──────────┘
-                         │
-                       Incident
-                         │
-             ┌───────────┴───────────┐
-             ▼                       ▼
-    ┌─────────────────┐     ┌─────────────────┐
-    │ Severity Agent  │     │ Diagnosis Agent │
-    │    Rig + LLM    │     │    Rig + LLM    │
-    └────────┬────────┘     └────────┬────────┘
-             │                       │
-             └───────────┬───────────┘
-                         ▼
-              ┌─────────────────────┐
-              │ Reporter Agent      │
-              │     Rig + LLM       │
-              └──────────┬──────────┘
-                         │
-                         ▼
-                  IncidentReport
-#+end_src
+[[./images/architecture.png]]
 * Organization
+** Global
 #+begin_src emacs-lisp
 otoko/
 │
 ├── Cargo.toml
-│
-├── config/
-│   └── default.toml
+├── Cargo.lock
 │
 ├── src/
-│   │
 │   ├── main.rs
 │   ├── lib.rs
+│   │
+│   ├── agents/
+│   │   ├── mod.rs
+│   │   ├── prompt.rs
+│   │   │
+│   │   ├── correlator.rs
+│   │   ├── mock_correlator.rs
+│   │   ├── ollama_correlator.rs
+│   │   │
+│   │   ├── severity.rs
+│   │   ├── severity_validator.rs
+│   │   ├── mock_severity.rs
+│   │   ├── ollama_severity.rs
+│   │   │
+│   │   ├── diagnosis.rs
+│   │   ├── diagnosis_validator.rs
+│   │   ├── mock_diagnosis.rs
+│   │   ├── ollama_diagnosis.rs
+│   │   │
+│   │   ├── mock_analyzer.rs
+│   │   ├── ollama_analyzer.rs
+│   │   └── validator.rs
+│   │
+│   ├── collector/
+│   │   ├── mod.rs
+│   │   ├── fake.rs
+│   │   └── ssh.rs
+│   │
+│   ├── config/
+│   │   ├── mod.rs
+│   │   ├── analyzer.rs
+│   │   ├── correlator.rs
+│   │   ├── severity.rs
+│   │   ├── diagnosis.rs
+│   │   ├── pipeline.rs
+│   │   └── ssh.rs
 │   │
 │   ├── domain/
 │   │   ├── mod.rs
 │   │   ├── log.rs
 │   │   ├── event.rs
 │   │   ├── incident.rs
+│   │   ├── severity.rs
+│   │   ├── diagnosis.rs
+│   │   ├── analysis.rs
 │   │   └── report.rs
-│   │
-│   ├── collector/
-│   │   ├── mod.rs
-│   │   └── ssh.rs
 │   │
 │   ├── normalizer/
 │   │   ├── mod.rs
 │   │   └── syslog.rs
 │   │
-│   ├── agents/
-│   │   ├── mod.rs
-│   │   ├── analyzer.rs
-│   │   ├── correlator.rs
-│   │   ├── severity.rs
-│   │   ├── diagnosis.rs
-│   │   └── reporter.rs
-│   │
 │   ├── orchestration/
 │   │   ├── mod.rs
-│   │   └── orchestrator.rs
+│   │   └── pipeline.rs
 │   │
-│   ├── llm/
+│   ├── probes/
 │   │   ├── mod.rs
-│   │   └── provider.rs
+│   │   ├── fake.rs
+│   │   └── ssh.rs
 │   │
-│   └── config/
-│       └── mod.rs
+│   └── tools/
+│       ├── mod.rs
+│       ├── service_status.rs
+│       ├── disk_usage.rs
+│       ├── socket_list.rs
+│       └── recent_logins.rs
 │
 └── tests/
-    ├── collector.rs
-    ├── normalizer.rs
-    ├── analyzer.rs
-    ├── correlator.rs
-    ├── severity.rs
     ├── diagnosis.rs
-    ├── reporter.rs
-    └── pipeline.rs
+    ├── ollama_diagnosis.rs
+    ├── ollama_diagnosis_tools.rs
+    ├── pipeline.rs
+    ├── ssh_probe.rs
+    └── tools.rs
+#+end_src
+** Logical Organisation
+#+begin_src emacs-lisp
+collector/
+    │
+    │ récupération des logs
+    ▼
+normalizer/
+    │
+    │ RawLog → LogBatch
+    ▼
+agents/
+    │
+    │ Analyzer
+    │ Correlator
+    │ Severity
+    │ Diagnosis
+    ▼
+orchestration/
+    │
+    │ coordination du pipeline
+    ▼
+domain/
+    │
+    │ structures métier
+    ▼
+résultat
+#+end_src
+** Extension branch
+#+begin_src emacs-lisp
+DiagnosisAgent
+      │
+      │ tool calling Rig
+      ▼
+    tools/
+      │
+      │ API autorisée
+      ▼
+    probes/
+      │
+      ├──────────────┐
+      ▼              ▼
+ FakeFreeBsdProbe   SshFreeBsdProbe
+                         │
+                         │ SSH
+                         ▼
+                      FreeBSD
 #+end_src
 * Functions
 ** Summary

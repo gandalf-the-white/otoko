@@ -38,7 +38,7 @@ async fn diagnosis_agent_can_use_read_only_tools() {
 
     let probe = Arc::new(FakeFreeBsdProbe);
 
-    let agent = OllamaDiagnosisAgent::new(DiagnosisConfig::new("qwen3:8b"), probe)
+    let agent = OllamaDiagnosisAgent::new(DiagnosisConfig::new("qwen3.8"), probe)
         .expect("agent should be created");
 
     let diagnosis = agent

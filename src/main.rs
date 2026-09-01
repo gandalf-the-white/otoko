@@ -211,11 +211,11 @@ async fn main() -> anyhow::Result<()> {
     let severity = OllamaSeverityAgent::new(SeverityConfig::new(MODEL))?;
 
     let ssh_config = SshConfig::new(
-        "freebsd.example.local",
+        "freebsd",
         22,
-        "monitor",
-        "/path/to/id_ed25519",
-        "/path/to/known_hosts",
+        "spike",
+        "/Users/laurent/.ssh/id_ed25519_proxmox",
+        "/Users/laurent/.ssh/known_hosts",
     );
 
     let probe = Arc::new(SshFreeBsdProbe::connect(&ssh_config).await?);
