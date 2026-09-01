@@ -1,9 +1,15 @@
+use std::sync::Arc;
+
 use otoko::{
     agents::{OllamaCorrelator, OllamaDiagnosisAgent, OllamaLogAnalyzer, OllamaSeverityAgent},
     collector::{FakeLogSource, LogScenario, LogSource},
-    config::{AnalyzerConfig, CorrelatorConfig, DiagnosisConfig, PipelineConfig, SeverityConfig},
+    config::{
+        AnalyzerConfig, CorrelatorConfig, DiagnosisConfig, PipelineConfig, SeverityConfig,
+        SshConfig,
+    },
     normalizer::{LogNormalizer, SyslogNormalizer},
     orchestration::AnalysisPipeline,
+    probes::SshFreeBsdProbe,
 };
 
 const MODEL: &str = "qwen3.8:latest";
@@ -157,6 +163,37 @@ async fn main() -> anyhow::Result<()> {
 
     // ------------------------------------------
 
+    // tracing_subscriber::fmt().with_target(false).init();
+
+    // let source = FakeLogSource::from_scenario(LogScenario::SuspiciousSshSession);
+
+    // let raw_logs = source.collect()?;
+
+    // let normalizer = SyslogNormalizer::new(2026);
+
+    // let batch = normalizer.normalize(&raw_logs)?;
+
+    // let analyzer = OllamaLogAnalyzer::new(AnalyzerConfig::new(MODEL))?;
+
+    // let correlator = OllamaCorrelator::new(CorrelatorConfig::new(MODEL))?;
+
+    // let severity = OllamaSeverityAgent::new(SeverityConfig::new(MODEL))?;
+
+    // let diagnosis = OllamaDiagnosisAgent::new(DiagnosisConfig::new(MODEL))?;
+
+    // let pipeline = AnalysisPipeline::new(
+    //     analyzer,
+    //     correlator,
+    //     severity,
+    //     diagnosis,
+    //     PipelineConfig::new(2, 2),
+    // )?;
+
+    // let result = pipeline.run(&batch).await?;
+
+    // println!("{result:#?}");
+
+    // ------------------------------------------
     tracing_subscriber::fmt().with_target(false).init();
 
     let source = FakeLogSource::from_scenario(LogScenario::SuspiciousSshSession);
@@ -173,7 +210,17 @@ async fn main() -> anyhow::Result<()> {
 
     let severity = OllamaSeverityAgent::new(SeverityConfig::new(MODEL))?;
 
-    let diagnosis = OllamaDiagnosisAgent::new(DiagnosisConfig::new(MODEL))?;
+    let ssh_config = SshConfig::new(
+        "freebsd.example.local",
+        22,
+        "monitor",
+        "/path/to/id_ed25519",
+        "/path/to/known_hosts",
+    );
+
+    let probe = Arc::new(SshFreeBsdProbe::connect(&ssh_config).await?);
+
+    let diagnosis = OllamaDiagnosisAgent::new(DiagnosisConfig::new(MODEL), probe)?;
 
     let pipeline = AnalysisPipeline::new(
         analyzer,

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::Result;
 use async_trait::async_trait;
 
@@ -8,6 +10,8 @@ use tracing::{debug, info};
 use crate::{
     config::DiagnosisConfig,
     domain::{AssessedIncident, Diagnosis},
+    probes::ReadOnlyFreeBsdProbe,
+    tools::{DiskUsageTool, RecentLoginsTool, ServiceStatusTool, SocketListTool},
 };
 
 use super::{
@@ -21,12 +25,17 @@ pub struct OllamaDiagnosisAgent {
 }
 
 impl OllamaDiagnosisAgent {
-    pub fn new(config: DiagnosisConfig) -> Result<Self> {
+    pub fn new(config: DiagnosisConfig, probe: Arc<dyn ReadOnlyFreeBsdProbe>) -> Result<Self> {
         let client = ollama::Client::new(Nothing)?;
 
         let agent = client
             .agent(&config.model)
             .preamble(DIAGNOSIS_PREAMBLE)
+            .default_max_turns(6)
+            .tool(ServiceStatusTool::new(Arc::clone(&probe)))
+            .tool(DiskUsageTool::new(Arc::clone(&probe)))
+            .tool(SocketListTool::new(Arc::clone(&probe)))
+            .tool(RecentLoginsTool::new(probe))
             .build();
 
         Ok(Self {
@@ -42,8 +51,10 @@ impl DiagnoseIncident for OllamaDiagnosisAgent {
         info!(
             incident_title =
                 %incident.incident.title,
+
             severity =
                 ?incident.severity.severity,
+
             "starting incident diagnosis"
         );
 
