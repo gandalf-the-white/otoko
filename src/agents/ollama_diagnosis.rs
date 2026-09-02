@@ -11,7 +11,9 @@ use crate::{
     config::DiagnosisConfig,
     domain::{AssessedIncident, Diagnosis},
     probes::ReadOnlyFreeBsdProbe,
-    tools::{DiskUsageTool, RecentLoginsTool, ServiceStatusTool, SocketListTool},
+    tools::{
+        DiskUsageTool, ObservationHistory, RecentLoginsTool, ServiceStatusTool, SocketListTool,
+    },
 };
 
 use super::{
@@ -22,25 +24,29 @@ use super::{
 pub struct OllamaDiagnosisAgent {
     agent: Agent,
     validator: DiagnosisValidator,
+    // history: ObservationHistory,
 }
 
 impl OllamaDiagnosisAgent {
     pub fn new(config: DiagnosisConfig, probe: Arc<dyn ReadOnlyFreeBsdProbe>) -> Result<Self> {
         let client = ollama::Client::new(Nothing)?;
 
+        let history = ObservationHistory::new();
+
         let agent = client
             .agent(&config.model)
             .preamble(DIAGNOSIS_PREAMBLE)
             .default_max_turns(6)
-            .tool(ServiceStatusTool::new(Arc::clone(&probe)))
-            .tool(DiskUsageTool::new(Arc::clone(&probe)))
-            .tool(SocketListTool::new(Arc::clone(&probe)))
-            .tool(RecentLoginsTool::new(probe))
+            .tool(ServiceStatusTool::new(Arc::clone(&probe), history.clone()))
+            .tool(DiskUsageTool::new(Arc::clone(&probe), history.clone()))
+            .tool(SocketListTool::new(Arc::clone(&probe), history.clone()))
+            .tool(RecentLoginsTool::new(Arc::clone(&probe), history.clone()))
             .build();
 
         Ok(Self {
             agent,
             validator: DiagnosisValidator,
+            // history,
         })
     }
 }

@@ -1,8 +1,10 @@
 mod fake;
 mod ssh;
+mod timed;
 
 pub use fake::FakeFreeBsdProbe;
 pub use ssh::SshFreeBsdProbe;
+pub use timed::TimedFreeBsdProbe;
 
 use async_trait::async_trait;
 use serde::Serialize;
@@ -18,6 +20,9 @@ pub struct CommandObservation {
 pub enum ProbeError {
     #[error("invalid FreeBSD service name: {0}")]
     InvalidServiceName(String),
+
+    #[error("probe operation timed out: {operation}")]
+    Timeout { operation: String },
 
     #[error("SSH error: {0}")]
     Ssh(#[from] async_ssh2_tokio::Error),

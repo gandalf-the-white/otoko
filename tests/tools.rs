@@ -4,14 +4,15 @@ use rig::tool::{Tool, ToolContext};
 
 use otoko::{
     probes::FakeFreeBsdProbe,
-    tools::{ServiceStatusArgs, ServiceStatusTool},
+    tools::{ObservationHistory, ServiceStatusArgs, ServiceStatusTool},
 };
 
 #[tokio::test]
 async fn service_status_tool_uses_probe() {
     let probe = Arc::new(FakeFreeBsdProbe);
+    let history = ObservationHistory::new();
 
-    let tool = ServiceStatusTool::new(probe);
+    let tool = ServiceStatusTool::new(probe, history);
 
     let mut context = ToolContext::new();
 
@@ -30,7 +31,8 @@ async fn service_status_tool_uses_probe() {
 
 #[test]
 fn service_status_tool_has_safe_description() {
-    let tool = ServiceStatusTool::new(Arc::new(FakeFreeBsdProbe));
+    let history = ObservationHistory::new();
+    let tool = ServiceStatusTool::new(Arc::new(FakeFreeBsdProbe), history);
 
     let description = tool.description();
 

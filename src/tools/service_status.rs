@@ -1,4 +1,4 @@
-use std::{future::Future, sync::Arc};
+use std::{convert::Infallible, future::Future, sync::Arc};
 
 use rig::{
     serde_json,
@@ -7,7 +7,10 @@ use rig::{
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use crate::probes::{CommandObservation, ProbeError, ReadOnlyFreeBsdProbe};
+use crate::{
+    probes::ReadOnlyFreeBsdProbe,
+    tools::{ObservationHistory, ToolObservation},
+};
 
 #[derive(Debug, Deserialize)]
 pub struct ServiceStatusArgs {
@@ -16,11 +19,12 @@ pub struct ServiceStatusArgs {
 
 pub struct ServiceStatusTool {
     probe: Arc<dyn ReadOnlyFreeBsdProbe>,
+    history: ObservationHistory,
 }
 
 impl ServiceStatusTool {
-    pub fn new(probe: Arc<dyn ReadOnlyFreeBsdProbe>) -> Self {
-        Self { probe }
+    pub fn new(probe: Arc<dyn ReadOnlyFreeBsdProbe>, history: ObservationHistory) -> Self {
+        Self { probe, history }
     }
 }
 
@@ -29,9 +33,9 @@ impl Tool for ServiceStatusTool {
 
     type Args = ServiceStatusArgs;
 
-    type Output = CommandObservation;
+    type Output = ToolObservation;
 
-    type Error = ProbeError;
+    type Error = Infallible;
 
     fn description(&self) -> String {
         concat!(
@@ -66,7 +70,18 @@ impl Tool for ServiceStatusTool {
         args: Self::Args,
     ) -> impl Future<Output = Result<Self::Output, Self::Error>> + Send {
         let probe = Arc::clone(&self.probe);
+        let history = self.history.clone();
 
-        async move { probe.service_status(&args.service).await }
+        async move {
+            let observation = match probe.service_status(&args.service).await {
+                Ok(value) => ToolObservation::success(Self::NAME, value),
+
+                Err(error) => ToolObservation::from_probe_error(Self::NAME, error),
+            };
+
+            history.record(observation.clone()).await;
+
+            Ok(observation)
+        }
     }
 }
