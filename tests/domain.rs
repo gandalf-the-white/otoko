@@ -102,6 +102,7 @@ fn incident_report_contains_recommendations() {
         severity: Severity::High,
         summary: "Multiple failed SSH attempts".to_string(),
         evidence: vec!["Failed login from 10.0.0.52".to_string()],
+        observations: Vec::new(),
         probable_causes: vec!["SSH brute force".to_string()],
         investigations: vec!["Inspect auth.log".to_string()],
         recommendations: vec!["Review SSH configuration".to_string()],

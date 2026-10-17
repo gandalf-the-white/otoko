@@ -1,4 +1,5 @@
 use anyhow::Result;
+use async_trait::async_trait;
 use futures::future::try_join_all;
 use tokio::sync::Semaphore;
 use tracing::{debug, info};
@@ -7,6 +8,7 @@ use crate::{
     agents::{AnalyzeLogs, AssessSeverity, CorrelateEvents, DiagnoseIncident},
     config::PipelineConfig,
     domain::{AnalysisResult, AssessedIncident, DiagnosedIncident, Incident, LogBatch},
+    orchestration::application::RunAnalysis,
 };
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -157,5 +159,18 @@ where
         });
 
         try_join_all(futures).await
+    }
+}
+
+#[async_trait]
+impl<A, C, S, D> RunAnalysis for AnalysisPipeline<A, C, S, D>
+where
+    A: AnalyzeLogs + Send + Sync,
+    C: CorrelateEvents + Send + Sync,
+    S: AssessSeverity + Send + Sync,
+    D: DiagnoseIncident + Send + Sync,
+{
+    async fn run_analysis(&self, batch: &LogBatch) -> Result<AnalysisResult> {
+        self.run(batch).await
     }
 }

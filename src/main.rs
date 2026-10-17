@@ -2,12 +2,16 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use otoko::{
-    agents::{OllamaCorrelator, OllamaDiagnosisAgent, OllamaLogAnalyzer, OllamaSeverityAgent},
+    agents::{
+        OllamaCorrelator, OllamaDiagnosisAgent, OllamaLogAnalyzer, OllamaReporterAgent,
+        OllamaSeverityAgent,
+    },
     collector::{FakeLogSource, LogScenario, LogSource},
     config::{AnalyzerConfig, CorrelatorConfig, DiagnosisConfig, PipelineConfig, SeverityConfig},
     normalizer::{LogNormalizer, SyslogNormalizer},
-    orchestration::AnalysisPipeline,
+    orchestration::{AnalysisPipeline, MonitoringApplication},
     probes::FakeFreeBsdProbe,
+    report::MarkdownReportExporter,
 };
 
 const MODEL: &str = "qwen3.8";
@@ -212,6 +216,51 @@ async fn main() -> Result<()> {
     // SECTION 10
     // ===========================================
 
+    // tracing_subscriber::fmt().with_target(false).init();
+
+    // let source = FakeLogSource::from_scenario(LogScenario::SuspiciousSshSession);
+
+    // let raw_logs = source.collect()?;
+
+    // let normalizer = SyslogNormalizer::new(2026);
+
+    // let batch = normalizer.normalize(&raw_logs)?;
+
+    // let analyzer = OllamaLogAnalyzer::new(AnalyzerConfig::new(MODEL))?;
+
+    // let correlator = OllamaCorrelator::new(CorrelatorConfig::new(MODEL))?;
+
+    // let severity = OllamaSeverityAgent::new(SeverityConfig::new(MODEL))?;
+
+    // // let ssh_config = SshConfig::new(
+    // //     "freebsd",
+    // //     22,
+    // //     "spike",
+    // //     "/Users/laurent/.ssh/id_ed25519_proxmox",
+    // //     "/Users/laurent/.ssh/known_hosts",
+    // // );
+
+    // // let probe = Arc::new(SshFreeBsdProbe::connect(&ssh_config).await?);
+    // let probe = Arc::new(FakeFreeBsdProbe);
+
+    // let diagnosis = OllamaDiagnosisAgent::new(DiagnosisConfig::new(MODEL), probe)?;
+
+    // let pipeline = AnalysisPipeline::new(
+    //     analyzer,
+    //     correlator,
+    //     severity,
+    //     diagnosis,
+    //     PipelineConfig::new(2, 2),
+    // )?;
+
+    // let result = pipeline.run(&batch).await?;
+
+    // println!("{result:#?}");
+
+    // ===========================================
+    // SECTION 12
+    // ===========================================
+
     tracing_subscriber::fmt().with_target(false).init();
 
     let source = FakeLogSource::from_scenario(LogScenario::SuspiciousSshSession);
@@ -241,6 +290,10 @@ async fn main() -> Result<()> {
 
     let diagnosis = OllamaDiagnosisAgent::new(DiagnosisConfig::new(MODEL), probe)?;
 
+    let reporter = OllamaReporterAgent::new(MODEL)?;
+
+    let exporter = MarkdownReportExporter::new("reports");
+
     let pipeline = AnalysisPipeline::new(
         analyzer,
         correlator,
@@ -249,8 +302,20 @@ async fn main() -> Result<()> {
         PipelineConfig::new(2, 2),
     )?;
 
-    let result = pipeline.run(&batch).await?;
+    // let result = pipeline.run(&batch).await?;
 
-    println!("{result:#?}");
+    let application = MonitoringApplication::new(pipeline, reporter, exporter);
+
+    let output = application.run(&batch).await?;
+
+    println!("Report generated: {}", output.report_path.display());
+
+    println!("Incidents: {}", output.report.metadata.incident_count);
+
+    println!(
+        "Summary source: {:?}",
+        output.report.metadata.summary_source
+    );
+
     Ok(())
 }

@@ -1,4 +1,4 @@
-use crate::domain::{LogAnalysis, LogBatch};
+use crate::domain::{IncidentReport, LogAnalysis, LogBatch, ReportSummary};
 use anyhow::Result;
 use async_trait::async_trait;
 
@@ -12,6 +12,7 @@ mod mock_severity;
 mod ollama_analyzer;
 mod ollama_correlator;
 mod ollama_diagnosis;
+mod ollama_reporter;
 mod ollama_severity;
 mod prompt;
 mod severity;
@@ -28,6 +29,7 @@ pub use mock_severity::MockSeverityAgent;
 pub use ollama_analyzer::OllamaLogAnalyzer;
 pub use ollama_correlator::OllamaCorrelator;
 pub use ollama_diagnosis::OllamaDiagnosisAgent;
+pub use ollama_reporter::OllamaReporterAgent;
 pub use ollama_severity::OllamaSeverityAgent;
 pub use severity::AssessSeverity;
 pub use severity_validator::SeverityValidator;
@@ -36,4 +38,9 @@ pub use validator::{EvidenceValidationError, EvidenceValidator};
 #[async_trait]
 pub trait AnalyzeLogs {
     async fn analyze(&self, batch: &LogBatch) -> Result<LogAnalysis>;
+}
+
+#[async_trait]
+pub trait GenerateReportSummary: Send + Sync {
+    async fn summarize(&self, incidents: &[IncidentReport]) -> Result<ReportSummary>;
 }

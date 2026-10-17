@@ -6,7 +6,7 @@ use otoko::{
 
 #[tokio::test]
 async fn empty_analysis_produces_no_incident() {
-    let config = CorrelatorConfig::new("qwen3:8b");
+    let config = CorrelatorConfig::new("qwen3.8");
 
     let correlator = OllamaCorrelator::new(config).expect("correlator creation should succeed");
 
