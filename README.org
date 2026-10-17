@@ -1,46 +1,249 @@
 #+title: Syslog AI on FreeBSD
 * Introduction
 Just to brainstorm about a multi-agent system conception thank to AI. The idea is to analyze different logs from a /FreeBSD/ server using /jails/ as architecture.
-* Architecture
-[[./images/architecture.png]]
-* Organization
-** Global
+It consists of five main layers: data collection, normalization, multi-agent analysis, diagnostics, and reporting.
+* Functional Architecture
+#+begin_src emacs-lisp
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                              FREEBSD AI MONITOR                                     │
+│                          MonitoringApplication (Rust)                               │
+│                                                                                     │
+│  ┌───────────────────────────────────────────────────────────────────────────────┐  │
+│  │                          1. DATA COLLECTION                                   │  │
+│  │                                                                               │  │
+│  │    ┌───────────────────┐             ┌─────────────────────┐                  │  │
+│  │    │  FreeBSD Server   │             │   FakeLogSource     │                  │  │
+│  │    │                   │             │     (Testing)       │                  │  │
+│  │    │ /var/log/messages │             └──────────┬──────────┘                  │  │
+│  │    │ /var/log/auth.log │                        │                             │  │
+│  │    │ /var/log/secure   │                        │                             │  │
+│  │    └─────────┬─────────┘                        │                             │  │
+│  │              │ SSH                              │                             │  │
+│  │              ▼                                  │                             │  │
+│  │    ┌───────────────────┐                        │                             │  │
+│  │    │   SSH Collector   │                        │                             │  │
+│  │    └─────────┬─────────┘                        │                             │  │
+│  │              │                                  │                             │  │
+│  │              └────────────────┬─────────────────┘                             │  │
+│  │                               ▼                                               │  │
+│  │                           RawLogs                                             │  │
+│  └───────────────────────────────┬───────────────────────────────────────────────┘  │
+│                                  │                                                  │
+│  ┌───────────────────────────────▼───────────────────────────────────────────────┐  │
+│  │                         2. NORMALIZATION                                      │  │
+│  │                                                                               │  │
+│  │                       ┌───────────────────────┐                               │  │
+│  │                       │   SyslogNormalizer    │                               │  │
+│  │                       │                       │                               │  │
+│  │                       │ - Parse timestamps    │                               │  │
+│  │                       │ - Extract hostname    │                               │  │
+│  │                       │ - Extract process     │                               │  │
+│  │                       │ - Normalize messages  │                               │  │
+│  │                       └───────────┬───────────┘                               │  │
+│  │                                   │                                           │  │
+│  │                                   ▼                                           │  │
+│  │                                LogBatch                                       │  │
+│  └───────────────────────────────────┬───────────────────────────────────────────┘  │
+│                                      │                                              │
+│  ┌───────────────────────────────────▼───────────────────────────────────────────┐  │
+│  │                        3. MULTI-AGENT ANALYSIS                                │  │
+│  │                                                                               │  │
+│  │                         AnalysisPipeline                                      │  │
+│  │                                                                               │  │
+│  │                      ┌───────────────────────┐                                │  │
+│  │                      │   LogAnalyzerAgent    │                                │  │
+│  │                      │      Rig/Ollama       │                                │  │
+│  │                      │                       │                                │  │
+│  │                      │ Identify events       │                                │  │
+│  │                      └───────────┬───────────┘                                │  │
+│  │                                  │                                            │  │
+│  │                                  ▼                                            │  │
+│  │                             LogAnalysis                                       │  │
+│  │                                  │                                            │  │
+│  │                                  ▼                                            │  │
+│  │                      ┌───────────────────────┐                                │  │
+│  │                      │    CorrelatorAgent    │                                │  │
+│  │                      │      Rig/Ollama       │                                │  │
+│  │                      │                       │                                │  │
+│  │                      │ Correlate events      │                                │  │
+│  │                      └───────────┬───────────┘                                │  │
+│  │                                  │                                            │  │
+│  │                                  ▼                                            │  │
+│  │                               Incidents                                       │  │
+│  │                                  │                                            │  │
+│  │                                  ▼                                            │  │
+│  │                      ┌───────────────────────┐                                │  │
+│  │                      │     SeverityAgent     │                                │  │
+│  │                      │      Rig/Ollama       │                                │  │
+│  │                      │                       │                                │  │
+│  │                      │ Assess severity       │                                │  │
+│  │                      └───────────┬───────────┘                                │  │
+│  │                                  │                                            │  │
+│  │                                  ▼                                            │  │
+│  │                          AssessedIncident                                     │  │
+│  │                                  │                                            │  │
+│  │                                  ▼                                            │  │
+│  │                      ┌───────────────────────┐                                │  │
+│  │                      │    DiagnosisAgent     │◄──────────────┐                │  │
+│  │                      │      Rig/Ollama       │               │                │  │
+│  │                      │                       │               │                │  │
+│  │                      │ Root cause analysis   │               │                │  │
+│  │                      │ Recommendations       │               │                │  │
+│  │                      └───────────┬───────────┘               │                │  │
+│  │                                  │                           │                │  │
+│  │                                  ▼                           │                │  │
+│  │                            DiagnosisResult                   │                │  │
+│  │                                  │                           │                │  │
+│  │                                  ▼                           │                │  │
+│  │                            AnalysisResult                    │                │  │
+│  └──────────────────────────────────┬───────────────────────────┼────────────────┘  │
+│                                     │                           │                   │
+│  ┌──────────────────────────────────┼───────────────────────────┼────────────────┐  │
+│  │                         4. DIAGNOSTIC TOOLS                  │                │  │
+│  │                                  │                           │                │  │
+│  │    ┌─────────────────────────────┴───────────────────────────┴──────────┐     │  │
+│  │    │                     Rig Tool Calling                               │     │  │
+│  │    │                                                                    │     │  │
+│  │    │  ServiceStatusTool    DiskUsageTool    SocketListTool              │     │  │
+│  │    │  RecentLoginsTool                                                  │     │  │
+│  │    └─────────────────────────────┬────────────────────────────────--────┘     │  │
+│  │                                  │                                            │  │
+│  │                                  ▼                                            │  │
+│  │                        TimedFreeBsdProbe                                      │  │
+│  │                                  │                                            │  │
+│  │                        ┌─────────┴──────────┐                                 │  │
+│  │                        ▼                    ▼                                 │  │
+│  │                 SshFreeBsdProbe       FakeFreeBsdProbe                        │  │
+│  │                        │                 (Testing)                            │  │
+│  │                        │ SSH                                                  │  │
+│  │                        ▼                                                      │  │
+│  │                   FreeBSD Server                                              │  │
+│  │                                                                               │  │
+│  │           Results → SystemObservation → ObservationHistory                    │  │
+│  └──────────────────────────────────────────────────────────────────────────--───┘  │
+│                                                                                     │
+│  ┌───────────────────────────────────────────────────────────────────────────────┐  │
+│  │                         5. REPORT GENERATION                                  │  │
+│  │                                                                               │  │
+│  │                          AnalysisResult                                       │  │
+│  │                                │                                              │  │
+│  │                                ▼                                              │  │
+│  │                       ReportDataBuilder                                       │  │
+│  │                                │                                              │  │
+│  │                                ▼                                              │  │
+│  │                         IncidentReport[]                                      │  │
+│  │                                │                                              │  │
+│  │                    ┌───────────┴───────────┐                                  │  │
+│  │                    ▼                       ▼                                  │  │
+│  │             ReporterAgent             FallbackSummary                         │  │
+│  │              Rig/Ollama                  (Rust)                               │  │
+│  │                    │                       │                                  │  │
+│  │                    └───────────┬───────────┘                                  │  │
+│  │                                │                                              │  │
+│  │                                ▼                                              │  │
+│  │                          AnalysisReport                                       │  │
+│  │                                │                                              │  │
+│  │                                ▼                                              │  │
+│  │                       MarkdownRenderer                                        │  │
+│  │                                │                                              │  │
+│  │                                ▼                                              │  │
+│  │                       MarkdownExporter                                        │  │
+│  │                                │                                              │  │
+│  │                                ▼                                              │  │
+│  │                       reports/<uuid>.md                                       │  │
+│  └───────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+#+end_src
+* Simplified view of interactions between agents
+#+begin_src emacs-lisp
+                             ┌──────────────────────┐
+                             │    FreeBSD Server    │
+                             └──────────┬───────────┘
+                                        │
+                                        │ SSH
+                                        ▼
+                             ┌──────────────────────┐
+                             │      Collector       │
+                             │    (Rust / SSH)      │
+                             └──────────┬───────────┘
+                                        │ RawLogs
+                                        ▼
+                             ┌──────────────────────┐
+                             │      Normalizer      │
+                             │        (Rust)        │
+                             └──────────┬───────────┘
+                                        │ LogBatch
+                                        ▼
+                             ┌──────────────────────┐
+                             │     LogAnalyzer      │
+                             │     (Rig / LLM)      │
+                             └──────────┬───────────┘
+                                        │ Events
+                                        ▼
+                             ┌──────────────────────┐
+                             │      Correlator      │
+                             │     (Rig / LLM)      │
+                             └──────────┬───────────┘
+                                        │ Incidents
+                                        ▼
+                             ┌──────────────────────┐
+                             │    SeverityAgent     │
+                             │     (Rig / LLM)      │
+                             └──────────┬───────────┘
+                                        │ AssessedIncidents
+                                        ▼
+                             ┌──────────────────────┐
+                             │    DiagnosisAgent    │◄───────────┐
+                             │     (Rig / LLM)      │            │
+                             └──────────┬───────────┘            │
+                                        │                        │
+                                        │                 ┌──────┴───────┐
+                                        │                 │  Rig Tools   │
+                                        │                 └──────┬───────┘
+                                        │                        │
+                                        │                 ┌──────▼───────┐
+                                        │                 │ FreeBSD SSH  │
+                                        │                 │    Probes    │
+                                        │                 └──────────────┘
+                                        │
+                                        │ DiagnosisResult
+                                        ▼
+                             ┌──────────────────────┐
+                             │   ReportDataBuilder  │
+                             │        (Rust)        │
+                             └──────────┬───────────┘
+                                        │
+                                        ▼
+                             ┌──────────────────────┐
+                             │    ReporterAgent     │
+                             │     (Rig / LLM)      │
+                             └──────────┬───────────┘
+                                        │
+                                        ▼
+                             ┌──────────────────────┐
+                             │    ReportGenerator   │
+                             │        (Rust)        │
+                             └──────────┬───────────┘
+                                        │
+                                        ▼
+                             ┌──────────────────────┐
+                             │   Markdown / Export  │
+                             └──────────────────────┘
+#+end_src
+DiagnosisAgent can call upon multiple tools, possibly over the course of several reasoning cycles. However, it does not have direct access to a generic shell.
+
+* Rust Software Architecture
+
 #+begin_src emacs-lisp
 otoko/
 │
 ├── Cargo.toml
-├── Cargo.lock
 │
 ├── src/
+│   │
 │   ├── main.rs
 │   ├── lib.rs
-│   │
-│   ├── agents/
-│   │   ├── mod.rs
-│   │   ├── prompt.rs
-│   │   │
-│   │   ├── correlator.rs
-│   │   ├── mock_correlator.rs
-│   │   ├── ollama_correlator.rs
-│   │   │
-│   │   ├── severity.rs
-│   │   ├── severity_validator.rs
-│   │   ├── mock_severity.rs
-│   │   ├── ollama_severity.rs
-│   │   │
-│   │   ├── diagnosis.rs
-│   │   ├── diagnosis_validator.rs
-│   │   ├── mock_diagnosis.rs
-│   │   ├── ollama_diagnosis.rs
-│   │   │
-│   │   ├── mock_analyzer.rs
-│   │   ├── ollama_analyzer.rs
-│   │   └── validator.rs
-│   │
-│   ├── collector/
-│   │   ├── mod.rs
-│   │   ├── fake.rs
-│   │   └── ssh.rs
 │   │
 │   ├── config/
 │   │   ├── mod.rs
@@ -49,189 +252,106 @@ otoko/
 │   │   ├── severity.rs
 │   │   ├── diagnosis.rs
 │   │   ├── pipeline.rs
-│   │   └── ssh.rs
+│   │   ├── ssh.rs
+│   │   └── probe.rs
 │   │
-│   ├── domain/
+│   ├── collector/
 │   │   ├── mod.rs
-│   │   ├── log.rs
-│   │   ├── event.rs
-│   │   ├── incident.rs
-│   │   ├── severity.rs
-│   │   ├── diagnosis.rs
-│   │   ├── analysis.rs
-│   │   └── report.rs
+│   │   ├── ssh.rs
+│   │   └── fake.rs
 │   │
 │   ├── normalizer/
 │   │   ├── mod.rs
 │   │   └── syslog.rs
 │   │
-│   ├── orchestration/
+│   ├── domain/
 │   │   ├── mod.rs
-│   │   └── pipeline.rs
+│   │   ├── observation.rs
+│   │   ├── diagnosis.rs
+│   │   └── report.rs
+│   │
+│   ├── agents/
+│   │   ├── mod.rs
+│   │   ├── prompt.rs
+│   │   ├── ollama_analyzer.rs
+│   │   ├── ollama_correlator.rs
+│   │   ├── ollama_severity.rs
+│   │   ├── ollama_diagnosis.rs
+│   │   └── ollama_reporter.rs
 │   │
 │   ├── probes/
 │   │   ├── mod.rs
+│   │   ├── ssh.rs
 │   │   ├── fake.rs
-│   │   └── ssh.rs
+│   │   └── timed.rs
 │   │
-│   └── tools/
+│   ├── tools/
+│   │   ├── mod.rs
+│   │   ├── context.rs
+│   │   ├── history.rs
+│   │   ├── service_status.rs
+│   │   ├── disk_usage.rs
+│   │   ├── socket_list.rs
+│   │   └── recent_logins.rs
+│   │
+│   ├── validators/
+│   │   ├── mod.rs
+│   │   └── report.rs
+│   │
+│   ├── orchestration/
+│   │   ├── mod.rs
+│   │   ├── pipeline.rs
+│   │   └── application.rs
+│   │
+│   └── report/
 │       ├── mod.rs
-│       ├── service_status.rs
-│       ├── disk_usage.rs
-│       ├── socket_list.rs
-│       └── recent_logins.rs
+│       ├── builder.rs
+│       ├── generator.rs
+│       ├── renderer.rs
+│       ├── fallback.rs
+│       └── exporter.rs
 │
-└── tests/
-    ├── diagnosis.rs
-    ├── ollama_diagnosis.rs
-    ├── ollama_diagnosis_tools.rs
-    ├── pipeline.rs
-    ├── ssh_probe.rs
-    └── tools.rs
+├── tests/
+│   ├── tools.rs
+│   ├── probe_timeout.rs
+│   ├── ssh_probe.rs
+│   ├── ollama_diagnosis_tools.rs
+│   ├── report_builder.rs
+│   ├── report_renderer.rs
+│   ├── report_generator.rs
+│   ├── report_fallback.rs
+│   ├── report_exporter.rs
+│   ├── ollama_reporter.rs
+│   └── application.rs
+│
+└── reports/
+    └── freebsd-report-<uuid>.md
 #+end_src
-** Logical Organisation
+
+* Isolation
+Our architecture is based on three fundamental principles.
+The domain model is independent of the AI. The LogBatch, Incident, DiagnosisResult, and AnalysisReport structures are Rust objects. They must not depend directly on Rig’s or Ollama’s internal types.
+Agents have only the capabilities they need. The LogAnalyzer interprets logs, the Correlator establishes relationships, the SeverityAgent assesses severity, and the DiagnosisAgent proposes hypotheses that it can enrich with remote observations. The ReporterAgent simply synthesizes the results.
+The orchestrator remains in control of the workflow. It is Rust—not the LLM—that determines the order of major steps, validates results, handles errors, and saves the report.
+
+* Pipeline and multi-agent system
 #+begin_src emacs-lisp
-collector/
-    │
-    │ récupération des logs
-    ▼
-normalizer/
-    │
-    │ RawLog → LogBatch
-    ▼
-agents/
-    │
-    │ Analyzer
-    │ Correlator
-    │ Severity
-    │ Diagnosis
-    ▼
-orchestration/
-    │
-    │ coordination du pipeline
-    ▼
-domain/
-    │
-    │ structures métier
-    ▼
-résultat
+                ORCHESTRATION RUST
+                       │
+         ┌─────────────┼─────────────┐
+         │             │             │
+         ▼             ▼             ▼
+     Analyzer      Correlator      Severity
+         │             │             │
+         └─────────────┼─────────────┘
+                       │
+                       ▼
+                    Diagnosis
+                       │
+                       ▼
+                    Reporter
 #+end_src
-** Extension branch
-#+begin_src emacs-lisp
-DiagnosisAgent
-      │
-      │ tool calling Rig
-      ▼
-    tools/
-      │
-      │ API autorisée
-      ▼
-    probes/
-      │
-      ├──────────────┐
-      ▼              ▼
- FakeFreeBsdProbe   SshFreeBsdProbe
-                         │
-                         │ SSH
-                         ▼
-                      FreeBSD
-#+end_src
-* Functions
-** Summary
-Just to break down the platform into six main areas of responsibility, 4 of which actually use an /LLM/.
-
-#+begin_src emacs-lisp
-Component           AI              Responsibility
-Collector           ❌              Collect FreeBSD logs
-Normalizer          ❌              Convert logs into Rust structures
-Log Analyzer Agent  ✅              Analyze each group of logs
-Correlator Agent    ✅              Detect related events
-Severity Agent      ✅/optional     Assess severity
-Diagnosis Agent     ✅              Suggest causes and investigations
-Reporter Agent      ✅              Generate a clear report
-Orchestrator        ❌ initially    Coordinate the workflow
-#+end_src
-
-** Log Analyzer Agent
-His role:
-+ Analyze a set of logs and identify significant events.
-** Correlator Agent
-He asks the question:
-+ Are these events related?
-#+begin_src emacs-lisp
-LogAnalyzer
-     │
-     │ Vec<DetectedEvent>
-     ▼
-Correlator
-     │
-     │ Incident
-     ▼
-...
-#+end_src
-** Severity Agent
-He responds only to:
-+ How serious is this incident?
-** Diagnosis Agent
-He receives:
-+ Incident
-+ Severity Assessment
-and looking for
-#+begin_src emacs-lisp
-POSSIBLE CAUSES
-       │
-       ├── SSH brute force attack
-       ├── compromised password
-       └── possible false positive
-
-INVESTIGATIONS
-       │
-       ├── check /var/log/auth.log
-       ├── check “last”
-       ├── look up source IP
-       └── check sudo commands
-
-RECOMMENDATIONS
-       │
-       ├── check the SSH key
-       ├── disable password authentication
-       └── temporarily block the IP
-#+end_src
-** Reporter Agent
-Input
-+ Incident
-+ Severity Assessment
-+ Diagnosis
-and the result (for example)
-#+begin_src emacs-lisp
-====================================================
-INCIDENT REPORT
-====================================================
-
-Severity: HIGH
-
-Incident:
-Suspicious SSH authentication activity
-
-Summary:
-Multiple failed login attempts originating from
-192.168.1.52 were followed by a successful login.
-
-Evidence:
-
-  13:41 failed root login
-  13:42 failed root login
-  13:42 failed admin login
-  13:44 successful spike login
-
-Possible cause:
-
-  SSH brute force followed by successful compromise.
-
-Recommended investigations:
-
-  - inspect last
-  - inspect sudo logs
-  - inspect running processes
-  - verify the source IP
-#+end_src
+Each agent has a specific specialization, but their interactions are governed by Rust contracts.
+This architecture is particularly well-suited to our training: it facilitates testing, understanding of behavior, and control over LLM calls.
+Eventually, it may evolve into a more distributed architecture, with agents running in separate processes, possibly on different machines.
+The next step I recommend is to consolidate the contracts between modules, then introduce PostgreSQL persistence for incidents, diagnostics, and observations. We can then use this history to perform temporal correlations, detect recurring incidents, and lay the groundwork for building a knowledge graph.
