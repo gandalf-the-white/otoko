@@ -1,6 +1,8 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use super::SystemObservation;
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct ProbableCause {
     pub description: String,
@@ -22,4 +24,10 @@ pub struct Diagnosis {
     pub probable_causes: Vec<ProbableCause>,
     pub investigations: Vec<Investigation>,
     pub recommendations: Vec<Recommendation>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DiagnosisResult {
+    pub diagnosis: Diagnosis,
+    pub observations: Vec<SystemObservation>,
 }

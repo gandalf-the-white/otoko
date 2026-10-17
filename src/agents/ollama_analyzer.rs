@@ -1,19 +1,16 @@
 use anyhow::Result;
 use async_trait::async_trait;
-
-use rig::{Agent, client::Nothing, prelude::*, providers::ollama};
+use rig::{Agent, AgentBuilder, providers::ollama::Ollama};
 use tracing::{debug, info};
 
 use crate::{
     agents::{
-        EvidenceValidator,
+        AnalyzeLogs, EvidenceValidator,
         prompt::{ANALYZER_PREAMBLE, build_analyzer_prompt},
     },
     config::AnalyzerConfig,
     domain::{LogAnalysis, LogBatch},
 };
-
-use super::AnalyzeLogs;
 
 pub struct OllamaLogAnalyzer {
     agent: Agent,
@@ -22,12 +19,9 @@ pub struct OllamaLogAnalyzer {
 
 impl OllamaLogAnalyzer {
     pub fn new(config: AnalyzerConfig) -> Result<Self> {
-        let client = ollama::Client::new(Nothing)?;
-
-        let agent = client
-            .agent(&config.model)
-            .preamble(ANALYZER_PREAMBLE)
-            .build();
+        let client = Ollama::new();
+        let model = client.completion(&config.model);
+        let agent = AgentBuilder::new(model).preamble(ANALYZER_PREAMBLE).build();
 
         Ok(Self {
             agent,
@@ -43,13 +37,12 @@ impl AnalyzeLogs for OllamaLogAnalyzer {
 
         if batch.is_empty() {
             debug!("empty batch, skipping LLM");
-
             return Ok(LogAnalysis { events: Vec::new() });
         }
 
         let prompt = build_analyzer_prompt(batch)?;
 
-        let analysis = self.agent.prompt_typed::<LogAnalysis>(prompt).await?;
+        let analysis = self.agent.prompt_typed::<LogAnalysis>(prompt).await?.output;
 
         info!(
             event_count = analysis.events.len(),
@@ -57,8 +50,6 @@ impl AnalyzeLogs for OllamaLogAnalyzer {
         );
 
         self.validator.validate(batch, &analysis)?;
-
-        debug!("evidence validation completed");
 
         Ok(analysis)
     }

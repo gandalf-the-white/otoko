@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::Severity;
+use crate::domain::Severity;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IncidentReport {

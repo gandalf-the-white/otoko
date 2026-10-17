@@ -1,3 +1,3 @@
 mod pipeline;
 
-pub use pipeline::AnalysisPipeline;
+pub use pipeline::{AnalysisPipeline, PipelineError};

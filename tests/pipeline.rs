@@ -73,4 +73,5 @@ async fn pipeline_runs_all_agents() {
     assert_eq!(result.incidents[0].assessed.severity, severity);
 
     assert_eq!(result.incidents[0].diagnosis, diagnosis);
+    assert!(result.incidents[0].observations.is_empty());
 }

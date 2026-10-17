@@ -1,6 +1,11 @@
 use otoko::{
-    agents::{AssessSeverity, MockSeverityAgent},
-    domain::{Incident, Severity, SeverityAssessment},
+    agents::{
+        AnalyzeLogs, AssessSeverity, CorrelateEvents, MockCorrelator, MockLogAnalyzer,
+        MockSeverityAgent,
+    },
+    domain::{
+        DetectedEvent, EventCategory, Incident, LogAnalysis, LogBatch, Severity, SeverityAssessment,
+    },
 };
 
 #[tokio::test]
@@ -33,17 +38,6 @@ async fn mock_severity_returns_configured_assessment() {
 
 #[tokio::test]
 async fn multi_agent_pipeline_can_use_mocks() {
-    use otoko::{
-        agents::{
-            AnalyzeLogs, AssessSeverity, CorrelateEvents, MockCorrelator, MockLogAnalyzer,
-            MockSeverityAgent,
-        },
-        domain::{
-            DetectedEvent, EventCategory, Incident, LogAnalysis, LogBatch, Severity,
-            SeverityAssessment,
-        },
-    };
-
     let event = DetectedEvent {
         category: EventCategory::Authentication,
 

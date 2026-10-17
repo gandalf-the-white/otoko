@@ -3,13 +3,13 @@ use std::sync::Arc;
 use anyhow::Result;
 use async_trait::async_trait;
 
-use rig::{Agent, client::Nothing, prelude::*, providers::ollama};
+use rig::{prelude::*, providers::ollama::Ollama};
 
 use tracing::{debug, info};
 
 use crate::{
     config::DiagnosisConfig,
-    domain::{AssessedIncident, Diagnosis},
+    domain::{AssessedIncident, Diagnosis, DiagnosisResult},
     probes::ReadOnlyFreeBsdProbe,
     tools::{
         DiskUsageTool, ObservationHistory, RecentLoginsTool, ServiceStatusTool, SocketListTool,
@@ -22,51 +22,59 @@ use super::{
 };
 
 pub struct OllamaDiagnosisAgent {
-    agent: Agent,
+    config: DiagnosisConfig,
+    probe: Arc<dyn ReadOnlyFreeBsdProbe>,
     validator: DiagnosisValidator,
-    // history: ObservationHistory,
 }
 
 impl OllamaDiagnosisAgent {
     pub fn new(config: DiagnosisConfig, probe: Arc<dyn ReadOnlyFreeBsdProbe>) -> Result<Self> {
-        let client = ollama::Client::new(Nothing)?;
-
-        let history = ObservationHistory::new();
-
-        let agent = client
-            .agent(&config.model)
-            .preamble(DIAGNOSIS_PREAMBLE)
-            .default_max_turns(6)
-            .tool(ServiceStatusTool::new(Arc::clone(&probe), history.clone()))
-            .tool(DiskUsageTool::new(Arc::clone(&probe), history.clone()))
-            .tool(SocketListTool::new(Arc::clone(&probe), history.clone()))
-            .tool(RecentLoginsTool::new(Arc::clone(&probe), history.clone()))
-            .build();
-
         Ok(Self {
-            agent,
+            config,
+            probe,
             validator: DiagnosisValidator,
-            // history,
         })
     }
 }
 
 #[async_trait]
 impl DiagnoseIncident for OllamaDiagnosisAgent {
-    async fn diagnose(&self, incident: &AssessedIncident) -> Result<Diagnosis> {
+    async fn diagnose(&self, incident: &AssessedIncident) -> Result<DiagnosisResult> {
         info!(
             incident_title =
                 %incident.incident.title,
-
             severity =
                 ?incident.severity.severity,
-
             "starting incident diagnosis"
         );
 
+        let history = ObservationHistory::new();
+
+        let client = Ollama::new();
+
+        let model = client.completion(&self.config.model);
+
+        let agent = AgentBuilder::new(model)
+            .preamble(DIAGNOSIS_PREAMBLE)
+            .default_max_turns(6)
+            .tool(ServiceStatusTool::new(
+                Arc::clone(&self.probe),
+                history.clone(),
+            ))
+            .tool(DiskUsageTool::new(Arc::clone(&self.probe), history.clone()))
+            .tool(SocketListTool::new(
+                Arc::clone(&self.probe),
+                history.clone(),
+            ))
+            .tool(RecentLoginsTool::new(
+                Arc::clone(&self.probe),
+                history.clone(),
+            ))
+            .build();
+
         let prompt = build_diagnosis_prompt(incident)?;
 
-        let diagnosis = self.agent.prompt_typed::<Diagnosis>(prompt).await?;
+        let diagnosis = agent.prompt_typed::<Diagnosis>(prompt).await?.output;
 
         self.validator.validate(&diagnosis)?;
 
@@ -77,6 +85,9 @@ impl DiagnoseIncident for OllamaDiagnosisAgent {
             "diagnosis validated"
         );
 
-        Ok(diagnosis)
+        Ok(DiagnosisResult {
+            diagnosis,
+            observations: history.snapshot().await,
+        })
     }
 }

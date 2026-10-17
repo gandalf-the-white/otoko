@@ -1,8 +1,24 @@
 use otoko::{
-    agents::{CorrelateEvents, OllamaCorrelator},
+    agents::{AnalyzeLogs, CorrelateEvents, MockCorrelator, MockLogAnalyzer, OllamaCorrelator},
     config::CorrelatorConfig,
-    domain::{DetectedEvent, EventCategory, LogAnalysis},
+    domain::{DetectedEvent, EventCategory, Incident, LogAnalysis, LogBatch},
 };
+
+#[tokio::test]
+async fn empty_analysis_produces_no_incident() {
+    let config = CorrelatorConfig::new("qwen3:8b");
+
+    let correlator = OllamaCorrelator::new(config).expect("correlator creation should succeed");
+
+    let analysis = LogAnalysis { events: Vec::new() };
+
+    let incidents = correlator
+        .correlate(&analysis)
+        .await
+        .expect("empty correlation should succeed");
+
+    assert!(incidents.is_empty());
+}
 
 #[tokio::test]
 #[ignore = "requires a running Ollama server and model"]
@@ -53,11 +69,6 @@ async fn correlator_groups_related_ssh_events() {
 
 #[tokio::test]
 async fn analyzer_and_correlator_can_work_together() {
-    use otoko::{
-        agents::{AnalyzeLogs, CorrelateEvents, MockCorrelator, MockLogAnalyzer},
-        domain::{DetectedEvent, EventCategory, Incident, LogAnalysis, LogBatch},
-    };
-
     let event = DetectedEvent {
         category: EventCategory::Authentication,
 

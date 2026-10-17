@@ -40,7 +40,7 @@ fn log_batch_reports_its_size() {
             timestamp,
             host: "freebsd-server".to_string(),
             service: "sshd".to_string(),
-            message: "Failed password".to_string(),
+            message: "Failed password for root".to_string(),
         },
         LogEntry {
             timestamp,
@@ -65,10 +65,10 @@ fn empty_log_batch_is_empty() {
 }
 
 #[test]
-fn analysis_can_contain_detected_events() {
+fn analysis_can_obtain_detected_events() {
     let event = DetectedEvent {
         category: EventCategory::Authentication,
-        summary: "Repeated SSH authentication failures".to_string(),
+        summary: "Repeated SSH authentication failure".to_string(),
         evidence: vec![
             "Failed password for root from 10.0.0.52".to_string(),
             "Failed password for admin from 10.0.0.52".to_string(),
@@ -80,16 +80,15 @@ fn analysis_can_contain_detected_events() {
     };
 
     assert_eq!(analysis.events.len(), 1);
-
     assert_eq!(analysis.events[0].category, EventCategory::Authentication);
 }
 
 #[test]
 fn severity_assessment_contains_confidence() {
     let assessment = SeverityAssessment {
-        severity: Severity::High,
+        severity: otoko::domain::Severity::High,
         confidence: 0.9,
-        justification: "Repeated failed logins followed by successful authentication".to_string(),
+        justification: "Repeat failed logins followed by successful authentication".to_string(),
     };
 
     assert_eq!(assessment.severity, Severity::High);

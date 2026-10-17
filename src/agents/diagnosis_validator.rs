@@ -59,6 +59,7 @@ mod tests {
         Diagnosis {
             probable_causes: vec![ProbableCause {
                 description: "Possible unauthorized access".into(),
+
                 confidence: 0.7,
             }],
 

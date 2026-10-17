@@ -1,6 +1,6 @@
-use async_trait::async_trait;
-use std::future::Future;
 use std::{sync::Arc, time::Duration};
+
+use async_trait::async_trait;
 use tokio::time::timeout;
 
 use super::{CommandObservation, ProbeError, ReadOnlyFreeBsdProbe};

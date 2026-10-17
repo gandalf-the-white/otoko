@@ -1,8 +1,6 @@
 use anyhow::Result;
-
 use futures::future::try_join_all;
 use tokio::sync::Semaphore;
-
 use tracing::{debug, info};
 
 use crate::{
@@ -152,7 +150,8 @@ where
                 Ok::<DiagnosedIncident, anyhow::Error>(DiagnosedIncident {
                     assessed: incident,
 
-                    diagnosis: result,
+                    diagnosis: result.diagnosis,
+                    observations: result.observations,
                 })
             }
         });

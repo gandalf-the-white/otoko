@@ -1,5 +1,4 @@
 use chrono::{TimeZone, Utc};
-
 use otoko::{
     collector::{FakeLogSource, LogScenario, LogSource},
     domain::RawLog,
@@ -7,7 +6,7 @@ use otoko::{
 };
 
 #[test]
-fn normalizer_parses_standard_syslog_line() {
+fn normalizer_parses_standart_syslog_line() {
     let logs = vec![RawLog {
         source: "/var/log/auth.log".into(),
         content: concat!(
@@ -17,11 +16,11 @@ fn normalizer_parses_standard_syslog_line() {
         .into(),
     }];
 
-    let normalizer = SyslogNormalizer::new(2026);
+    let normalyzer = SyslogNormalizer::new(2026);
 
-    let batch = normalizer
+    let batch = normalyzer
         .normalize(&logs)
-        .expect("normalization should succeed");
+        .expect("normalization should suceed");
 
     assert_eq!(batch.len(), 1);
 

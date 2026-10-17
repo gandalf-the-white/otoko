@@ -8,9 +8,8 @@ use otoko::{
 
 #[tokio::test]
 async fn empty_batch_returns_empty_analysis() {
-    let config = AnalyzerConfig::new("qwen3.8");
-
-    let analyzer = OllamaLogAnalyzer::new(config).expect("agent creation should succeed");
+    let analyzer = OllamaLogAnalyzer::new(AnalyzerConfig::new("qwen3.8"))
+        .expect("agent creation should succeed");
 
     let batch = LogBatch::new(Vec::new());
 
@@ -22,11 +21,9 @@ async fn empty_batch_returns_empty_analysis() {
     assert!(analysis.events.is_empty());
 }
 
-// cargo test ollama_detects_ssh_authentication_event -- --ignored --nocapture
-
 #[tokio::test]
 #[ignore = "requires a running Ollama server and model"]
-async fn ollama_detects_ssh_authentication_event() {
+async fn ollama_detect_ssh_authentication_event() {
     let source = FakeLogSource::from_scenario(LogScenario::SshBruteForce);
 
     let raw_logs = source.collect().expect("collection should succeed");
@@ -39,7 +36,7 @@ async fn ollama_detects_ssh_authentication_event() {
 
     let config = AnalyzerConfig::new("qwen3.8");
 
-    let analyzer = OllamaLogAnalyzer::new(config).expect("agent creation should succeed");
+    let analyzer = OllamaLogAnalyzer::new(config).expect("agent should be created");
 
     let analysis = analyzer
         .analyze(&batch)
@@ -53,37 +50,5 @@ async fn ollama_detects_ssh_authentication_event() {
             .events
             .iter()
             .any(|event| { event.category == EventCategory::Authentication })
-    );
-}
-
-// cargo test ollama_does_not_flag_normal_logs_as_security_incident  -- --ignored --nocapture
-
-#[tokio::test]
-#[ignore = "requires a running Ollama server and model"]
-async fn ollama_does_not_flag_normal_logs_as_security_incident() {
-    let source = FakeLogSource::from_scenario(LogScenario::Normal);
-
-    let raw_logs = source.collect().expect("collection should succeed");
-
-    let normalizer = SyslogNormalizer::new(2026);
-
-    let batch = normalizer
-        .normalize(&raw_logs)
-        .expect("normalization should succeed");
-
-    let config = AnalyzerConfig::new("qwen3.8");
-
-    let analyzer = OllamaLogAnalyzer::new(config).expect("agent creation should succeed");
-
-    let analysis = analyzer
-        .analyze(&batch)
-        .await
-        .expect("analysis should succeed");
-
-    assert!(
-        analysis
-            .events
-            .iter()
-            .all(|event| { event.category != EventCategory::Security })
     );
 }

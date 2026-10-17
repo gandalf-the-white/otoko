@@ -66,7 +66,7 @@ fn disk_full_scenario_contains_no_space_error() {
 }
 
 #[test]
-fn all_scenarios_can_be_collected() {
+fn all_scenario_can_be_collected() {
     let scenarios = [
         LogScenario::Normal,
         LogScenario::SshBruteForce,

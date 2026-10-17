@@ -7,10 +7,17 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::{Incident, LogAnalysis};
 
-// #[async_trait]
-// pub trait CorrelateEvents {
-//     async fn correlate(&self, analysis: &LogAnalysis) -> Result<Vec<Incident>>;
-// }
+#[derive(Debug, thiserror::Error)]
+pub enum CorrelationError {
+    #[error("event index {index} does not exist")]
+    InvalidEventIndex { index: usize },
+
+    #[error("event index {index} appears more than once in an incident")]
+    DuplicateEventIndex { index: usize },
+
+    #[error("an incident must contain at least one event")]
+    EmptyIncident,
+}
 
 #[async_trait]
 pub trait CorrelateEvents: Send + Sync {
@@ -27,18 +34,6 @@ pub(crate) struct IncidentCandidate {
     pub title: String,
     pub event_indices: Vec<usize>,
     pub explanation: String,
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum CorrelationError {
-    #[error("event index {index} does not exist")]
-    InvalidEventIndex { index: usize },
-
-    #[error("event index {index} appears more than once in an incident")]
-    DuplicateEventIndex { index: usize },
-
-    #[error("an incident must contain at least one event")]
-    EmptyIncident,
 }
 
 pub(crate) fn build_incidents(
@@ -201,5 +196,27 @@ mod tests {
         let error = build_incidents(&analysis, plan).expect_err("empty incident should fail");
 
         assert!(matches!(error, CorrelationError::EmptyIncident));
+    }
+
+    #[tokio::test]
+    async fn empty_analysis_produces_no_incident() {
+        use crate::{
+            agents::{CorrelateEvents, OllamaCorrelator},
+            config::CorrelatorConfig,
+            domain::LogAnalysis,
+        };
+
+        let config = CorrelatorConfig::new("qwen3.8");
+
+        let correlator = OllamaCorrelator::new(config).expect("correlator creation should succeed");
+
+        let analysis = LogAnalysis { events: Vec::new() };
+
+        let incidents = correlator
+            .correlate(&analysis)
+            .await
+            .expect("empty correlation should succeed");
+
+        assert!(incidents.is_empty());
     }
 }

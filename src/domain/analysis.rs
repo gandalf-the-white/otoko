@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::domain::Diagnosis;
+use crate::domain::{Diagnosis, SystemObservation};
 
 use super::{Incident, LogAnalysis, SeverityAssessment};
 
@@ -20,4 +20,5 @@ pub struct AnalysisResult {
 pub struct DiagnosedIncident {
     pub assessed: AssessedIncident,
     pub diagnosis: Diagnosis,
+    pub observations: Vec<SystemObservation>,
 }

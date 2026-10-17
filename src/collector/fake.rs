@@ -83,6 +83,26 @@ fn ssh_brute_force_logs() -> Vec<RawLog> {
     }]
 }
 
+fn suspicious_ssh_session_logs() -> Vec<RawLog> {
+    vec![RawLog {
+        source: "/var/log/auth.log".into(),
+
+        content: concat!(
+            "Aug 26 14:01:02 freebsd sshd[800]: ",
+            "Failed password for spike from 10.0.0.52 port 50100 ssh2\n",
+            "Aug 26 14:01:08 freebsd sshd[801]: ",
+            "Failed password for spike from 10.0.0.52 port 50101 ssh2\n",
+            "Aug 26 14:01:15 freebsd sshd[802]: ",
+            "Failed password for spike from 10.0.0.52 port 50102 ssh2\n",
+            "Aug 26 14:04:10 freebsd sshd[810]: ",
+            "Accepted password for spike from 10.0.0.52 port 50110 ssh2\n",
+            "Aug 26 14:06:21 freebsd sudo[830]: ",
+            "spike : COMMAND=/usr/bin/id\n",
+        )
+        .into(),
+    }]
+}
+
 fn service_failure_logs() -> Vec<RawLog> {
     vec![RawLog {
         source: "/var/log/messages".into(),
@@ -106,26 +126,6 @@ fn disk_full_logs() -> Vec<RawLog> {
             "filesystem /var: write failed, no space left on device\n",
             "Aug 26 16:20:03 freebsd syslogd[540]: ",
             "write error: No space left on device\n",
-        )
-        .into(),
-    }]
-}
-
-fn suspicious_ssh_session_logs() -> Vec<RawLog> {
-    vec![RawLog {
-        source: "/var/log/auth.log".into(),
-
-        content: concat!(
-            "Aug 26 14:01:02 freebsd sshd[800]: ",
-            "Failed password for spike from 10.0.0.52 port 50100 ssh2\n",
-            "Aug 26 14:01:08 freebsd sshd[801]: ",
-            "Failed password for spike from 10.0.0.52 port 50101 ssh2\n",
-            "Aug 26 14:01:15 freebsd sshd[802]: ",
-            "Failed password for spike from 10.0.0.52 port 50102 ssh2\n",
-            "Aug 26 14:04:10 freebsd sshd[810]: ",
-            "Accepted password for spike from 10.0.0.52 port 50110 ssh2\n",
-            "Aug 26 14:06:21 freebsd sudo[830]: ",
-            "spike : COMMAND=/usr/bin/id\n",
         )
         .into(),
     }]

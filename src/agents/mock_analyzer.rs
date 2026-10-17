@@ -1,9 +1,10 @@
 use anyhow::Result;
 use async_trait::async_trait;
 
-use crate::domain::{LogAnalysis, LogBatch};
-
-use super::AnalyzeLogs;
+use crate::{
+    agents::AnalyzeLogs,
+    domain::{LogAnalysis, LogBatch},
+};
 
 #[derive(Debug, Clone)]
 pub struct MockLogAnalyzer {

@@ -2,11 +2,11 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex;
 
-use super::ToolObservation;
+use crate::domain::SystemObservation;
 
 #[derive(Debug, Clone, Default)]
 pub struct ObservationHistory {
-    inner: Arc<Mutex<Vec<ToolObservation>>>,
+    inner: Arc<Mutex<Vec<SystemObservation>>>,
 }
 
 impl ObservationHistory {
@@ -14,16 +14,12 @@ impl ObservationHistory {
         Self::default()
     }
 
-    pub async fn record(&self, observation: ToolObservation) {
+    pub async fn record(&self, observation: SystemObservation) {
         self.inner.lock().await.push(observation);
     }
 
-    pub async fn snapshot(&self) -> Vec<ToolObservation> {
+    pub async fn snapshot(&self) -> Vec<SystemObservation> {
         self.inner.lock().await.clone()
-    }
-
-    pub async fn clear(&self) {
-        self.inner.lock().await.clear();
     }
 
     pub async fn len(&self) -> usize {
@@ -32,14 +28,5 @@ impl ObservationHistory {
 
     pub async fn is_empty(&self) -> bool {
         self.inner.lock().await.is_empty()
-    }
-
-    pub async fn since(&self, index: usize) -> Vec<ToolObservation> {
-        self.inner
-            .lock()
-            .await
-            .get(index..)
-            .unwrap_or_default()
-            .to_vec()
     }
 }

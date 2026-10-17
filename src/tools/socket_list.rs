@@ -5,8 +5,9 @@ use rig::tool::{Tool, ToolContext};
 use serde_json::{Value, json};
 
 use crate::{
+    domain::SystemObservation,
     probes::ReadOnlyFreeBsdProbe,
-    tools::{ObservationHistory, ToolObservation},
+    tools::{ObservationHistory, result::to_system_observation},
 };
 
 use super::NoArgs;
@@ -27,7 +28,7 @@ impl Tool for SocketListTool {
 
     type Args = NoArgs;
 
-    type Output = ToolObservation;
+    type Output = SystemObservation;
 
     type Error = Infallible;
 
@@ -58,11 +59,13 @@ impl Tool for SocketListTool {
         let history = self.history.clone();
 
         async move {
-            let observation = match probe.socket_list().await {
-                Ok(value) => ToolObservation::success(Self::NAME, value),
+            // let observation = match probe.socket_list().await {
+            //     Ok(value) => ToolObservation::success(Self::NAME, value),
 
-                Err(error) => ToolObservation::from_probe_error(Self::NAME, error),
-            };
+            //     Err(error) => ToolObservation::from_probe_error(Self::NAME, error),
+            // };
+
+            let observation = to_system_observation(Self::NAME, probe.disk_usage().await);
 
             history.record(observation.clone()).await;
 

@@ -1,9 +1,9 @@
 use anyhow::Result;
 use async_trait::async_trait;
 
-use crate::domain::{AssessedIncident, Diagnosis};
+use crate::domain::{AssessedIncident, DiagnosisResult};
 
 #[async_trait]
-pub trait DiagnoseIncident {
-    async fn diagnose(&self, incident: &AssessedIncident) -> Result<Diagnosis>;
+pub trait DiagnoseIncident: Send + Sync {
+    async fn diagnose(&self, incident: &AssessedIncident) -> Result<DiagnosisResult>;
 }

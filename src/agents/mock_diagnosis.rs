@@ -1,7 +1,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 
-use crate::domain::{AssessedIncident, Diagnosis};
+use crate::domain::{AssessedIncident, Diagnosis, DiagnosisResult};
 
 use super::DiagnoseIncident;
 
@@ -18,7 +18,10 @@ impl MockDiagnosisAgent {
 
 #[async_trait]
 impl DiagnoseIncident for MockDiagnosisAgent {
-    async fn diagnose(&self, _incident: &AssessedIncident) -> Result<Diagnosis> {
-        Ok(self.diagnosis.clone())
+    async fn diagnose(&self, _incident: &AssessedIncident) -> Result<DiagnosisResult> {
+        Ok(DiagnosisResult {
+            diagnosis: self.diagnosis.clone(),
+            observations: Vec::new(),
+        })
     }
 }

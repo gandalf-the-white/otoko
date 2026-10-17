@@ -1,11 +1,12 @@
-use std::{convert::Infallible, future::Future, sync::Arc};
+use std::{future::Future, sync::Arc};
 
 use rig::tool::{Tool, ToolContext};
 use serde_json::{Value, json};
 
 use crate::{
+    domain::SystemObservation,
     probes::ReadOnlyFreeBsdProbe,
-    tools::{ObservationHistory, ToolObservation},
+    tools::{ObservationHistory, result::to_system_observation},
 };
 
 use super::NoArgs;
@@ -26,9 +27,9 @@ impl Tool for DiskUsageTool {
 
     type Args = NoArgs;
 
-    type Output = ToolObservation;
+    type Output = SystemObservation;
 
-    type Error = Infallible;
+    type Error = std::convert::Infallible;
 
     fn description(&self) -> String {
         concat!(
@@ -50,17 +51,15 @@ impl Tool for DiskUsageTool {
     fn call(
         &self,
         _context: &mut ToolContext,
+
         _args: Self::Args,
     ) -> impl Future<Output = Result<Self::Output, Self::Error>> + Send {
         let probe = Arc::clone(&self.probe);
+
         let history = self.history.clone();
 
         async move {
-            let observation = match probe.disk_usage().await {
-                Ok(value) => ToolObservation::success(Self::NAME, value),
-
-                Err(error) => ToolObservation::from_probe_error(Self::NAME, error),
-            };
+            let observation = to_system_observation(Self::NAME, probe.disk_usage().await);
 
             history.record(observation.clone()).await;
 

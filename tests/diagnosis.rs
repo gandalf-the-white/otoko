@@ -49,5 +49,6 @@ async fn mock_diagnosis_returns_configured_diagnosis() {
         .await
         .expect("diagnosis should succeed");
 
-    assert_eq!(diagnosis, expected);
+    assert_eq!(diagnosis.diagnosis, expected);
+    assert!(diagnosis.observations.is_empty());
 }

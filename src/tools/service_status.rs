@@ -1,15 +1,13 @@
 use std::{convert::Infallible, future::Future, sync::Arc};
 
-use rig::{
-    serde_json,
-    tool::{Tool, ToolContext},
-};
+use rig::tool::{Tool, ToolContext};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::{
+    domain::SystemObservation,
     probes::ReadOnlyFreeBsdProbe,
-    tools::{ObservationHistory, ToolObservation},
+    tools::{ObservationHistory, result::to_system_observation},
 };
 
 #[derive(Debug, Deserialize)]
@@ -33,7 +31,7 @@ impl Tool for ServiceStatusTool {
 
     type Args = ServiceStatusArgs;
 
-    type Output = ToolObservation;
+    type Output = SystemObservation;
 
     type Error = Infallible;
 
@@ -73,11 +71,8 @@ impl Tool for ServiceStatusTool {
         let history = self.history.clone();
 
         async move {
-            let observation = match probe.service_status(&args.service).await {
-                Ok(value) => ToolObservation::success(Self::NAME, value),
-
-                Err(error) => ToolObservation::from_probe_error(Self::NAME, error),
-            };
+            let observation =
+                to_system_observation(Self::NAME, probe.service_status(&args.service).await);
 
             history.record(observation.clone()).await;
 

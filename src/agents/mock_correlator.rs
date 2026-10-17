@@ -1,9 +1,10 @@
 use anyhow::Result;
 use async_trait::async_trait;
 
-use crate::domain::{Incident, LogAnalysis};
-
-use super::CorrelateEvents;
+use crate::{
+    agents::CorrelateEvents,
+    domain::{Incident, LogAnalysis},
+};
 
 #[derive(Debug, Clone)]
 pub struct MockCorrelator {

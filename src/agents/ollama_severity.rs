@@ -1,7 +1,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 
-use rig::{Agent, client::Nothing, prelude::*, providers::ollama};
+use rig::{Agent, prelude::*, providers::ollama::Ollama};
 
 use tracing::{debug, info};
 
@@ -22,12 +22,9 @@ pub struct OllamaSeverityAgent {
 
 impl OllamaSeverityAgent {
     pub fn new(config: SeverityConfig) -> Result<Self> {
-        let client = ollama::Client::new(Nothing)?;
-
-        let agent = client
-            .agent(&config.model)
-            .preamble(SEVERITY_PREAMBLE)
-            .build();
+        let client = Ollama::new();
+        let model = client.completion(&config.model);
+        let agent = AgentBuilder::new(model).preamble(SEVERITY_PREAMBLE).build();
 
         Ok(Self {
             agent,
@@ -52,7 +49,8 @@ impl AssessSeverity for OllamaSeverityAgent {
         let assessment = self
             .agent
             .prompt_typed::<SeverityAssessment>(prompt)
-            .await?;
+            .await?
+            .output;
 
         self.validator.validate(&assessment)?;
 

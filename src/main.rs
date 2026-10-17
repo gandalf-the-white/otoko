@@ -1,31 +1,35 @@
 use std::sync::Arc;
 
+use anyhow::Result;
 use otoko::{
     agents::{OllamaCorrelator, OllamaDiagnosisAgent, OllamaLogAnalyzer, OllamaSeverityAgent},
     collector::{FakeLogSource, LogScenario, LogSource},
-    config::{
-        AnalyzerConfig, CorrelatorConfig, DiagnosisConfig, PipelineConfig, SeverityConfig,
-        SshConfig,
-    },
+    config::{AnalyzerConfig, CorrelatorConfig, DiagnosisConfig, PipelineConfig, SeverityConfig},
     normalizer::{LogNormalizer, SyslogNormalizer},
     orchestration::AnalysisPipeline,
-    probes::SshFreeBsdProbe,
+    probes::FakeFreeBsdProbe,
 };
 
-const MODEL: &str = "qwen3.8:latest";
+const MODEL: &str = "qwen3.8";
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> Result<()> {
+    // ===========================================
+    // SECTION 2
+    // ===========================================
+
     // let source = FakeLogSource::new(vec![RawLog {
-    //     source: "/var/log/auth.log".into(),
-    //     content: "Failed password for root".into(),
+    //     source: "/var/log/auth.log".to_string(),
+    //     content: "Failed password for root".to_string(),
     // }]);
 
     // let logs = source.collect()?;
 
-    // println!("{} source(s) de logs récupérée(s)", logs.len());
+    // println!("{} log files retrieved", logs.len());
 
-    // ------------------------------------------
+    // ===========================================
+    // SECTION 3
+    // ===========================================
 
     // let source = FakeLogSource::from_scenario(LogScenario::SshBruteForce);
 
@@ -33,21 +37,23 @@ async fn main() -> anyhow::Result<()> {
 
     // for log in logs {
     //     println!("Source : {}", log.source);
-    //     println!("------------------------------");
+    //     println!("---------------------------");
     //     println!("{}", log.content);
     // }
 
-    // ------------------------------------------
+    // ===========================================
+    // SECTION 4
+    // ===========================================
 
     // let source = FakeLogSource::from_scenario(LogScenario::SshBruteForce);
 
-    // let raw_logs = source.collect()?;
+    // let raw_log = source.collect()?;
 
     // let normalizer = SyslogNormalizer::new(2026);
 
-    // let batch = normalizer.normalize(&raw_logs)?;
+    // let batch = normalizer.normalize(&raw_log)?;
 
-    // println!("{} événements syslog normalisés", batch.len());
+    // println!("{} Standardized syslog events", batch.len());
 
     // for entry in batch.entries {
     //     println!(
@@ -56,7 +62,9 @@ async fn main() -> anyhow::Result<()> {
     //     );
     // }
 
-    // ------------------------------------------
+    // ===========================================
+    // SECTION 5
+    // ===========================================
 
     // tracing_subscriber::fmt().with_target(false).init();
 
@@ -68,7 +76,11 @@ async fn main() -> anyhow::Result<()> {
 
     // let batch = normalizer.normalize(&raw_logs)?;
 
-    // let config = AnalyzerConfig::new(MODEL);
+    // println!("{} entries normalized", batch.len());
+
+    // println!("---------------------------");
+
+    // let config = AnalyzerConfig::new("qwen3.8");
 
     // let analyzer = OllamaLogAnalyzer::new(config)?;
 
@@ -76,7 +88,9 @@ async fn main() -> anyhow::Result<()> {
 
     // println!("{:#?}", analysis);
 
-    // ------------------------------------------
+    // ===========================================
+    // SECTION 6
+    // ===========================================
 
     // tracing_subscriber::fmt().with_target(false).init();
 
@@ -88,9 +102,9 @@ async fn main() -> anyhow::Result<()> {
 
     // let batch = normalizer.normalize(&raw_logs)?;
 
-    // let analyzer = OllamaLogAnalyzer::new(AnalyzerConfig::new(MODEL))?;
+    // let analyzer = OllamaLogAnalyzer::new(AnalyzerConfig::new("qwen3.8"))?;
 
-    // let correlator = OllamaCorrelator::new(CorrelatorConfig::new(MODEL))?;
+    // let correlator = OllamaCorrelator::new(CorrelatorConfig::new("qwen3.8"))?;
 
     // let analysis = analyzer.analyze(&batch).await?;
 
@@ -98,7 +112,9 @@ async fn main() -> anyhow::Result<()> {
 
     // println!("{incidents:#?}");
 
-    // ------------------------------------------
+    // ===========================================
+    // SECTION 7
+    // ===========================================
 
     // tracing_subscriber::fmt().with_target(false).init();
 
@@ -110,15 +126,15 @@ async fn main() -> anyhow::Result<()> {
 
     // let batch = normalizer.normalize(&raw_logs)?;
 
-    // let analyzer = OllamaLogAnalyzer::new(AnalyzerConfig::new(MODEL))?;
+    // let analyzer = OllamaLogAnalyzer::new(AnalyzerConfig::new("qwen3.8"))?;
 
-    // let correlator = OllamaCorrelator::new(CorrelatorConfig::new(MODEL))?;
+    // let correlator = OllamaCorrelator::new(CorrelatorConfig::new("qwen3.8"))?;
 
     // let analysis = analyzer.analyze(&batch).await?;
 
     // let incidents = correlator.correlate(&analysis).await?;
 
-    // let severity_agent = OllamaSeverityAgent::new(SeverityConfig::new(MODEL))?;
+    // let severity_agent = OllamaSeverityAgent::new(SeverityConfig::new("qwen3.8"))?;
 
     // for incident in &incidents {
     //     let assessment = severity_agent.assess(incident).await?;
@@ -132,7 +148,9 @@ async fn main() -> anyhow::Result<()> {
     //     println!("Justification: {}", assessment.justification);
     // }
 
-    // ------------------------------------------
+    // ===========================================
+    // SECTION 8
+    // ===========================================
 
     // tracing_subscriber::fmt().with_target(false).init();
 
@@ -144,24 +162,21 @@ async fn main() -> anyhow::Result<()> {
 
     // let batch = normalizer.normalize(&raw_logs)?;
 
-    // let analyzer = Arc::new(OllamaLogAnalyzer::new(AnalyzerConfig::new(MODEL))?);
+    // let analyzer = OllamaLogAnalyzer::new(AnalyzerConfig::new(MODEL))?;
 
-    // let correlator = Arc::new(OllamaCorrelator::new(CorrelatorConfig::new(MODEL))?);
+    // let correlator = OllamaCorrelator::new(CorrelatorConfig::new(MODEL))?;
 
-    // let severity_agent = Arc::new(OllamaSeverityAgent::new(SeverityConfig::new(MODEL))?);
+    // let severity = OllamaSeverityAgent::new(SeverityConfig::new(MODEL))?;
 
-    // let pipeline = AnalysisPipeline::new(
-    //     analyzer,
-    //     correlator,
-    //     severity_agent,
-    //     PipelineConfig::new(2)?,
-    // );
+    // let pipeline = AnalysisPipeline::new(analyzer, correlator, severity, PipelineConfig::new(2))?;
 
     // let result = pipeline.run(&batch).await?;
 
     // println!("{result:#?}");
 
-    // ------------------------------------------
+    // ===========================================
+    // SECTION 9
+    // ===========================================
 
     // tracing_subscriber::fmt().with_target(false).init();
 
@@ -193,7 +208,10 @@ async fn main() -> anyhow::Result<()> {
 
     // println!("{result:#?}");
 
-    // ------------------------------------------
+    // ===========================================
+    // SECTION 10
+    // ===========================================
+
     tracing_subscriber::fmt().with_target(false).init();
 
     let source = FakeLogSource::from_scenario(LogScenario::SuspiciousSshSession);
@@ -210,15 +228,16 @@ async fn main() -> anyhow::Result<()> {
 
     let severity = OllamaSeverityAgent::new(SeverityConfig::new(MODEL))?;
 
-    let ssh_config = SshConfig::new(
-        "freebsd",
-        22,
-        "spike",
-        "/Users/laurent/.ssh/id_ed25519_proxmox",
-        "/Users/laurent/.ssh/known_hosts",
-    );
+    // let ssh_config = SshConfig::new(
+    //     "freebsd",
+    //     22,
+    //     "spike",
+    //     "/Users/laurent/.ssh/id_ed25519_proxmox",
+    //     "/Users/laurent/.ssh/known_hosts",
+    // );
 
-    let probe = Arc::new(SshFreeBsdProbe::connect(&ssh_config).await?);
+    // let probe = Arc::new(SshFreeBsdProbe::connect(&ssh_config).await?);
+    let probe = Arc::new(FakeFreeBsdProbe);
 
     let diagnosis = OllamaDiagnosisAgent::new(DiagnosisConfig::new(MODEL), probe)?;
 
@@ -233,6 +252,5 @@ async fn main() -> anyhow::Result<()> {
     let result = pipeline.run(&batch).await?;
 
     println!("{result:#?}");
-
     Ok(())
 }

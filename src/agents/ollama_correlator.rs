@@ -1,17 +1,15 @@
 use anyhow::Result;
 use async_trait::async_trait;
-
-use rig::{Agent, client::Nothing, prelude::*, providers::ollama};
-
+use rig::{Agent, prelude::*, providers::ollama::Ollama};
 use tracing::{debug, info};
 
 use crate::{
+    agents::correlator::CorrelateEvents,
     config::CorrelatorConfig,
     domain::{Incident, LogAnalysis},
 };
 
 use super::{
-    CorrelateEvents,
     correlator::{CorrelationPlan, build_incidents},
     prompt::{CORRELATOR_PREAMBLE, build_correlator_prompt},
 };
@@ -22,10 +20,9 @@ pub struct OllamaCorrelator {
 
 impl OllamaCorrelator {
     pub fn new(config: CorrelatorConfig) -> Result<Self> {
-        let client = ollama::Client::new(Nothing)?;
-
-        let agent = client
-            .agent(&config.model)
+        let client = Ollama::new();
+        let model = client.completion(&config.model);
+        let agent = AgentBuilder::new(model)
             .preamble(CORRELATOR_PREAMBLE)
             .build();
 
@@ -49,7 +46,11 @@ impl CorrelateEvents for OllamaCorrelator {
 
         let prompt = build_correlator_prompt(analysis)?;
 
-        let plan = self.agent.prompt_typed::<CorrelationPlan>(prompt).await?;
+        let plan = self
+            .agent
+            .prompt_typed::<CorrelationPlan>(prompt)
+            .await?
+            .output;
 
         info!(
             incident_count = plan.incidents.len(),

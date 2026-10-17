@@ -10,3 +10,11 @@ impl ProbeConfig {
         Self { timeout }
     }
 }
+
+impl Default for ProbeConfig {
+    fn default() -> Self {
+        Self {
+            timeout: Duration::from_secs(5),
+        }
+    }
+}

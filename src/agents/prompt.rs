@@ -1,5 +1,4 @@
 use anyhow::Result;
-use rig::serde_json;
 
 use crate::domain::{AssessedIncident, Incident, LogAnalysis, LogBatch};
 
@@ -10,7 +9,6 @@ Your responsibility is limited to identifying significant events
 from the supplied normalized log entries.
 
 Rules:
-
 - Base every conclusion only on the supplied logs.
 - Do not invent evidence.
 - Do not diagnose root causes.
@@ -199,9 +197,7 @@ Assessed incident:
 mod tests {
     use chrono::{TimeZone, Utc};
 
-    use crate::domain::{
-        DetectedEvent, EventCategory, LogBatch, LogEntry, Severity, SeverityAssessment,
-    };
+    use crate::domain::{DetectedEvent, EventCategory, LogEntry, Severity, SeverityAssessment};
 
     use super::*;
 

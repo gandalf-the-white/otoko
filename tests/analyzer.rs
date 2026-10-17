@@ -1,15 +1,16 @@
 use chrono::{TimeZone, Utc};
-use otoko::{
-    agents::{AnalyzeLogs, EvidenceValidator, MockLogAnalyzer},
-    domain::{DetectedEvent, EventCategory, LogAnalysis, LogBatch, LogEntry},
-};
+use otoko::agents::{AnalyzeLogs, EvidenceValidator, MockLogAnalyzer, OllamaLogAnalyzer};
+use otoko::collector::{FakeLogSource, LogScenario, LogSource};
+use otoko::config::AnalyzerConfig;
+use otoko::domain::{DetectedEvent, EventCategory, LogAnalysis, LogBatch, LogEntry};
+use otoko::normalizer::{LogNormalizer, SyslogNormalizer};
 
 #[tokio::test]
 async fn mock_analyzer_returns_configured_analysis() {
     let expected = LogAnalysis {
         events: vec![DetectedEvent {
             category: EventCategory::Authentication,
-            summary: "Repeated SSH authentication failures".into(),
+            summary: "Repeat SSH authentication failure".into(),
             evidence: vec!["Failed password for root".into()],
         }],
     };
@@ -89,6 +90,35 @@ async fn pipeline_can_use_mock_analyzer() {
         .expect("analysis should succeed");
 
     assert_eq!(analysis, expected);
+}
+
+#[tokio::test]
+#[ignore = "requires a running Ollama server and model"]
+async fn ollama_does_not_flag_normal_logs_as_security_incident() {
+    let source = FakeLogSource::from_scenario(LogScenario::Normal);
+
+    let raw_logs = source.collect().expect("collection should succeed");
+
+    let normalizer = SyslogNormalizer::new(2026);
+
+    let batch = normalizer
+        .normalize(&raw_logs)
+        .expect("normalization should succeed");
+
+    let analyzer =
+        OllamaLogAnalyzer::new(AnalyzerConfig::new("qwen3.8")).expect("agent should be created");
+
+    let analysis = analyzer
+        .analyze(&batch)
+        .await
+        .expect("analysis should succeed");
+
+    assert!(
+        analysis
+            .events
+            .iter()
+            .all(|event| { event.category != EventCategory::Security })
+    );
 }
 
 #[test]

@@ -5,8 +5,9 @@ use rig::tool::{Tool, ToolContext};
 use serde_json::{Value, json};
 
 use crate::{
+    domain::SystemObservation,
     probes::ReadOnlyFreeBsdProbe,
-    tools::{ObservationHistory, ToolObservation},
+    tools::{ObservationHistory, result::to_system_observation},
 };
 
 use super::NoArgs;
@@ -27,7 +28,7 @@ impl Tool for RecentLoginsTool {
 
     type Args = NoArgs;
 
-    type Output = ToolObservation;
+    type Output = SystemObservation;
 
     type Error = Infallible;
 
@@ -56,13 +57,8 @@ impl Tool for RecentLoginsTool {
         let probe = Arc::clone(&self.probe);
         let history = self.history.clone();
 
-        // async move { probe.recent_logins().await }
         async move {
-            let observation = match probe.recent_logins().await {
-                Ok(value) => ToolObservation::success(Self::NAME, value),
-
-                Err(error) => ToolObservation::from_probe_error(Self::NAME, error),
-            };
+            let observation = to_system_observation(Self::NAME, probe.recent_logins().await);
 
             history.record(observation.clone()).await;
 

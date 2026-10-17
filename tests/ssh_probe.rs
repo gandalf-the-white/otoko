@@ -6,7 +6,7 @@ use otoko::{
 #[tokio::test]
 #[ignore = "requires access to the FreeBSD test host"]
 async fn ssh_probe_reads_disk_usage() {
-    let config = SshConfig::new(
+    let ssh_config = SshConfig::new(
         "freebsd",
         22,
         "spike",
@@ -14,7 +14,7 @@ async fn ssh_probe_reads_disk_usage() {
         "/Users/laurent/.ssh/known_hosts",
     );
 
-    let probe = SshFreeBsdProbe::connect(&config)
+    let probe = SshFreeBsdProbe::connect(&ssh_config)
         .await
         .expect("SSH connection should succeed");
 

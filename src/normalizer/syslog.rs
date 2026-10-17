@@ -1,11 +1,10 @@
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use chrono::{DateTime, Datelike, NaiveDateTime, TimeZone, Utc};
 
 use crate::domain::{LogBatch, LogEntry, RawLog};
 
 use super::LogNormalizer;
 
-#[derive(Debug, Clone, Copy)]
 pub struct SyslogNormalizer {
     year: i32,
 }
@@ -15,22 +14,31 @@ impl SyslogNormalizer {
         Self { year }
     }
 
-    pub fn current_year() -> Self {
+    pub fn current_year(&self) -> Self {
         Self {
             year: Utc::now().year(),
         }
     }
 
+    fn parse_timestamp(&self, month: &str, day: &str, time: &str) -> Result<DateTime<Utc>> {
+        let value = format!("{month} {day} {} {time}", self.year);
+
+        let naive = NaiveDateTime::parse_from_str(&value, "%b %e %Y %H:%M:%S")?;
+
+        Ok(Utc.from_utc_datetime(&naive))
+    }
+
     fn parse_line(&self, line: &str) -> Result<LogEntry> {
-        let (month, rest) = take_field(line).ok_or_else(|| anyhow!("missing month"))?;
+        let (month, rest) = take_field(line).ok_or_else(|| anyhow::anyhow!("missing month"))?;
 
-        let (day, rest) = take_field(rest).ok_or_else(|| anyhow!("missing day"))?;
+        let (day, rest) = take_field(rest).ok_or_else(|| anyhow::anyhow!("missing day"))?;
 
-        let (time, rest) = take_field(rest).ok_or_else(|| anyhow!("missing time"))?;
+        let (time, rest) = take_field(rest).ok_or_else(|| anyhow::anyhow!("missing time"))?;
 
-        let (host, rest) = take_field(rest).ok_or_else(|| anyhow!("missing host"))?;
+        let (host, rest) = take_field(rest).ok_or_else(|| anyhow::anyhow!("missing host"))?;
 
-        let (service_field, rest) = take_field(rest).ok_or_else(|| anyhow!("missing service"))?;
+        let (service_field, rest) =
+            take_field(rest).ok_or_else(|| anyhow::anyhow!("missing service"))?;
 
         let timestamp = self.parse_timestamp(month, day, time)?;
 
@@ -44,14 +52,6 @@ impl SyslogNormalizer {
             service,
             message,
         })
-    }
-
-    fn parse_timestamp(&self, month: &str, day: &str, time: &str) -> Result<DateTime<Utc>> {
-        let value = format!("{month} {day} {} {time}", self.year);
-
-        let naive = NaiveDateTime::parse_from_str(&value, "%b %e %Y %H:%M:%S")?;
-
-        Ok(Utc.from_utc_datetime(&naive))
     }
 }
 
@@ -84,12 +84,9 @@ fn take_field(input: &str) -> Option<(&str, &str)> {
         Some(index) => {
             let field = &input[..index];
             let rest = &input[index..];
-
             Some((field, rest))
         }
-
         None if !input.is_empty() => Some((input, "")),
-
         None => None,
     }
 }
@@ -99,7 +96,6 @@ fn parse_service(value: &str) -> String {
 
     match without_colon.find('[') {
         Some(index) => without_colon[..index].to_string(),
-
         None => without_colon.to_string(),
     }
 }
